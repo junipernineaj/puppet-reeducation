@@ -1,0 +1,1475 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8"/>
+	<title>Three-Weeks-And-Counting</title>
+	<meta name="author" content="Anthony Dawson"/>
+</head>
+<body>
+
+<p><link href="markdown2.css" rel="stylesheet"></link></p>
+
+<h2 id="puppettraining">Puppet Training</h2>
+
+<h3 id="chapter1-downloadsvirtualbox">Chapter 1 - Downloads VirtualBox</h3>
+
+<h4 id="installinggitanddownloadingtherepo">Installing Git and downloading the repo</h4>
+
+<p>To get a copy of the repo that accompanies this book, follow these steps:</p>
+
+<ul>
+<li>Browse to https://git-scm.com/downloads</li>
+<li>Download and install the right version of Git for your operating system.</li>
+<li>Run the following command:</li>
+</ul>
+
+<pre><code class="Shell">git clone https://github.com/bitfield/puppet-beginners-guide-3.git
+</code></pre>
+
+<h4 id="installingvirtualboxandvagrant">Installing VirtualBox and Vagrant</h4>
+
+<p>If you already have a Linux machine or cloud server you&#8217;d like to use for working through the examples, skip this section and move on to the next chapter. </p>
+
+<p>If you&#8217;d like to use VirtualBox and Vagrant to run a local virtual machine (VM) on your computer to use with the examples, follow these instructions:</p>
+
+<ul>
+<li>Browse to https://www.virtualbox.org/</li>
+<li>Download and install the right version of VirtualBox for your operating system</li>
+<li>Browse to https://www.vagrantup.com/downloads.html</li>
+<li>Select the right version of Vagrant for your operating system: OS X, Windows, and so on</li>
+<li>Follow the instructions to install the software</li>
+</ul>
+
+<h4 id="runningyourvagrantvm">Running your Vagrant VM</h4>
+
+<p>Once you have installed Vagrant, you can start the Puppet Beginner&#8217;s Guide virtual machine.</p>
+
+<p>Run the following commands:</p>
+
+<pre><code class="Shell">cd puppet-beginners-guide-3
+scripts/start_vagrant.sh
+</code></pre>
+
+<p>  Vagrant will begin downloading the base box. Once that has booted, it will install Puppet. </p>
+
+<p>This may take a while, but once the installation is complete, the virtual machine will be ready to use.</p>
+
+<p>Connect to the VM with the following command:</p>
+
+<pre><code class="Shell">vagrant ssh
+</code></pre>
+
+<p>You now have a command-line shell on the VM. Check that Puppet is installed and working by running the following command (you may get a different version number, which is fine):</p>
+
+<pre><code class="Shell">puppet --version
+5.2.0
+</code></pre>
+
+<h3 id="chapter2-creatingyourfirstmanifests">Chapter 2 - Creating your first manifests</h3>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:~$ export LANG=C
+vagrant@ubuntu-xenial:~$ export LC_ALL=C
+</code></pre>
+
+<p>On your Vagrant box, run the following command:</p>
+
+<pre><code class="Shell">sudo puppet apply /examples/file_hello.pp
+Notice: Compiled catalog for ubuntu-xenial in environment production in 0.07 seconds
+Notice: /Stage[main]/Main/File[/tmp/hello.txt]/ensure: defined content as '{md5}22c3683b094136c3398391ae71b20f04'
+Notice: Applied catalog in 0.01 seconds
+</code></pre>
+
+<h4 id="understandingthecode">Understanding the code</h4>
+
+<p>Let&#8217;s look at the example code to see what&#8217;s going on (run <code>cat /example/file_hello.pp</code>, or open the file in a text editor):</p>
+
+<pre><code class="Shell">file { '/tmp/hello.txt':
+  ensure  =&gt; file,
+  content =&gt; &quot;hello, world\n&quot;,
+}
+</code></pre>
+
+<p>The code term <code>file</code> begins a <strong>resource declaration</strong> for a <code>file</code> resource. A <strong>resource</strong> is some bit of configuration that you want Puppet to manage: for example, a file, user account, or package. A resource declaration follows this pattern:</p>
+
+<pre><code class="Shell">RESOURCE_TYPE { TITLE:
+  ATTRIBUTE =&gt; VALUE,
+  ...
+}
+</code></pre>
+
+<p>Resource declarations will make up almost all of your Puppet manifests, so it&#8217;s important to understand exactly how they work:</p>
+
+<ul>
+<li><code>RESOURCE_TYPE</code> indicates the type of resource you&#8217;re declaring; in this case, it&#8217;s a <code>file</code>.</li>
+<li><code>TITLE</code> is the name that Puppet uses to identify the resource internally.</li>
+</ul>
+
+<p>Every resource must have a unique title. With <code>file</code> resources, it&#8217;s usual for this to be the full path to the file: in this case, <code>/tmp/hello</code>.</p>
+
+<p>The remainder of this block of code is a list of attributes that describe how the resource should be configured. The attributes available depend on the type of the resource. For a file, you can set attributes such as <code>content</code>, <code>owner</code>, <code>group</code>, and <code>mode</code>, but one attribute that every resource supports is <code>ensure</code>.</p>
+
+<p>Again, the possible values for <code>ensure</code> are specific to the type of resource. In this case, we use <code>file</code> to indicate that we want a regular file, as opposed to a directory or symlink:</p>
+
+<pre><code class="Shell">ensure  =&gt; file,
+</code></pre>
+
+<p>Next, to put some text in the file, we specify the <code>content</code> attribute:</p>
+
+<pre><code class="Shell">content =&gt; &quot;hello, world\n&quot;,
+</code></pre>
+
+<p>The <code>content</code> attribute sets the contents of a file to a string value you provide. Here, the contents of the file are declared to be <code>hello, world</code>, followed by a newline character (in Puppet strings, we write the newline character as \n).</p>
+
+<p>Note that <code>content</code> specifies the entire content of the file; the string you provide will replace anything already in the file, rather than be appended to it.</p>
+
+<h5 id="modifyingexistingfiles">Modifying existing files</h5>
+
+<p>What happens if the file already exists when Puppet runs and it contains something else? Will Puppet change it?</p>
+
+<pre><code class="Shell">sudo sh -c 'echo &quot;goodbye, world&quot; &gt;/tmp/hello.txt'
+cat /tmp/hello.txt
+goodbye, world
+
+sudo puppet apply /examples/file_hello.pp
+cat /tmp/hello.txt
+hello, world
+</code></pre>
+
+<p>Yes!</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:~$ sudo sh -c 'echo &quot;goodbye, world&quot; &gt;/tmp/hello.txt'
+vagrant@ubuntu-xenial:~$ cat /tmp/hello.txt
+goodbye, world
+vagrant@ubuntu-xenial:~$ sudo puppet apply /examples/file_hello.pp
+Notice: Compiled catalog for ubuntu-xenial.ocado.com in environment production in 0.01 seconds
+Notice: /Stage[main]/Main/File[/tmp/hello.txt]/content: content changed '{md5}767887814e925822027f4fe63fb69ce2' to '{md5}22c3683b094136c3398391ae71b20f04'
+Notice: Applied catalog in 0.03 seconds
+vagrant@ubuntu-xenial:~$ cat /tmp/hello.txt
+hello, world
+vagrant@ubuntu-xenial:~$
+</code></pre>
+
+<p>If any attribute of the file, including its contents, doesn&#8217;t match the manifest, Puppet will change it so that it does.</p>
+
+<p>This can lead to some surprising results if you manually edit a file managed by Puppet. If you make changes to a file without also changing the Puppet manifest to match, Puppet will overwrite the file the next time it runs, and your changes will be lost.</p>
+
+<p>So it&#8217;s a good idea to add a comment to files that Puppet is managing: something like the following:</p>
+
+<pre><code class="Shell"># This file is managed by Puppet - any manual edits will be lost
+</code></pre>
+
+<p>Add this to Puppet&#8217;s copy of the file when you first deploy it, and it will remind you and others not to make manual changes.</p>
+
+<h5 id="dry-runningpuppet">Dry-running puppet</h5>
+
+<p>Because you can&#8217;t necessarily tell in advance what applying a Puppet manifest will change on the system, it&#8217;s a good idea to do a dry run first. </p>
+
+<p>Adding the <code>—noop</code> flag to <code>puppet apply</code> will show you what Puppet would have done, without actually changing anything:</p>
+
+<pre><code class="Shell">sudo sh -c 'echo &quot;goodbye, world&quot; &gt;/tmp/hello.txt'
+sudo puppet apply --noop /examples/file_hello.pp
+Notice: Compiled catalog for ubuntu-xenial in environment production in 0.04 seconds
+Notice: /Stage[main]/Main/File[/tmp/hello.txt]/content: current_value {md5}7678..., should be {md5}22c3... (noop)
+</code></pre>
+
+<p>As in:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:~$ sudo puppet apply --noop /examples/file_hello.pp
+Notice: Compiled catalog for ubuntu-xenial.ocado.com in environment production in 0.01 seconds
+Notice: /Stage[main]/Main/File[/tmp/hello.txt]/content: current_value '{md5}767887814e925822027f4fe63fb69ce2', should be '{md5}22c3683b094136c3398391ae71b20f04' (noop)
+Notice: Class[Main]: Would have triggered 'refresh' from 1 event
+Notice: Stage[main]: Would have triggered 'refresh' from 1 event
+Notice: Applied catalog in 0.01 seconds
+</code></pre>
+
+<p>Puppet decides whether or not a <code>file</code> resource needs updating, based on its MD5 hash sum. In the previous example, Puppet reports that the current value of the hash sum for <code>/tmp/hello.txt</code> is <code>7678…</code>, whereas according to the manifest, it should be <code>22c3…</code>. </p>
+
+<p>Accordingly, the file will be changed on the next Puppet run.</p>
+
+<p>If you want to see what change Puppet would actually make to the file, you can use the <code>—show_diff</code> option:</p>
+
+<pre><code class="Shell">sudo puppet apply --noop --show_diff /examples/file_hello.pp
+Notice: Compiled catalog for ubuntu-xenial in environment production in 0.04 seconds
+Notice: /Stage[main]/Main/File[/tmp/hello.txt]/content:
+--- /tmp/hello.txt      2017-02-13 02:27:13.186261355 -0800
++++ /tmp/puppet-file20170213-3671-2yynjt        2017-02-13 02:30:26.561834755 -0800
+@@ -1 +1 @@
+-goodbye, world
++hello, world
+</code></pre>
+
+<p>As in:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:~$ sudo puppet apply --noop --show_diff /examples/file_hello.pp
+Notice: Compiled catalog for ubuntu-xenial.ocado.com in environment production in 0.01 seconds
+Notice: /Stage[main]/Main/File[/tmp/hello.txt]/content:
+--- /tmp/hello.txt  2018-10-16 09:06:53.202787401 +0000
++++ /tmp/puppet-file20181016-27923-lyslrb   2018-10-16 09:10:31.842787401 +0000
+@@ -1 +1 @@
+-goodbye, world
++hello, world
+
+Notice: /Stage[main]/Main/File[/tmp/hello.txt]/content: current_value '{md5}767887814e925822027f4fe63fb69ce2', should be '{md5}22c3683b094136c3398391ae71b20f04' (noop)
+Notice: Class[Main]: Would have triggered 'refresh' from 1 event
+Notice: Stage[main]: Would have triggered 'refresh' from 1 event
+Notice: Applied catalog in 0.02 seconds
+</code></pre>
+
+<p>These options are very useful when you want to make sure that your Puppet manifest will affect only the things you&#8217;re expecting it to—or, sometimes, when you want to check if something has been changed outside Puppet without actually undoing the change.</p>
+
+<h5 id="howpuppetappliesthemanifest">How puppet applies the manifest</h5>
+
+<p>Here&#8217;s how your manifest is processed. </p>
+
+<p>First, Puppet reads the manifest and the list of resources it contains (in this case, there&#8217;s just one resource), and compiles these into a catalog (an internal representation of the desired state of the node).</p>
+
+<p>Puppet then works through the catalog, applying each resource in turn:</p>
+
+<ul>
+<li>First, it checks if the resource exists on the server. If not, Puppet creates it. In the example, we&#8217;ve declared that the file <code>/tmp/hello.txt</code> should exist. The first time you run <code>sudo puppet apply</code>, this won&#8217;t be the case, so Puppet will create the file for you.</li>
+<li>Then, for each resource, it checks the value of each attribute in the catalog against what actually exists on the server. In our example, there&#8217;s just one attribute: <code>content</code>. We&#8217;ve specified that the content of the file should be <code>hello, world\n</code>. If the file is empty or contains something else, Puppet will overwrite the file with what the catalog says it should contain.</li>
+</ul>
+
+<p>In this case, the file will be empty the first time you apply the catalog, so Puppet will write the string <code>hello, world\n</code> into it.</p>
+
+<p>We&#8217;ll go on to examine the <code>file</code> resource in much more detail in later chapters.</p>
+
+<h5 id="creatingafileofyourown">Creating a file of your own</h5>
+
+<p>Create your own manifest file (you can name it anything you like, so long as the file extension is <code>.pp</code>). </p>
+
+<p>Use a <code>file</code> resource to create a file on the server with any contents you like. Apply the manifest with Puppet and check that the file is created and contains the text you specified.</p>
+
+<p>Edit the file directly and change the contents, then re-apply Puppet and check that it changes the file back to what the manifest says it should contain.</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/examples$ cat file_tonytest.pp
+file { '/tmp/tonytest.txt’:
+    ensure  =&gt; file,
+    content =&gt; &quot;Hi there,\nMy name is AJ9\n&quot;,
+}
+</code></pre>
+
+<p>Run with:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/examples$ sudo puppet apply --noop --show_diff /examples/file_tonytest.pp
+Notice: Compiled catalog for ubuntu-xenial.ocado.com in environment production in 0.01 seconds
+Notice: /Stage[main]/Main/File[/tmp/file_tonytest.pp]/ensure: current_value 'absent', should be 'file' (noop)
+Notice: Class[Main]: Would have triggered 'refresh' from 1 event
+Notice: Stage[main]: Would have triggered 'refresh' from 1 event
+Notice: Applied catalog in 0.01 seconds
+vagrant@ubuntu-xenial:/examples$
+</code></pre>
+
+<p>This shows that the file is absent and would apply it.</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/examples$ sudo puppet apply /examples/file_tonytest.pp
+Notice: Compiled catalog for ubuntu-xenial.ocado.com in environment production in 0.01 seconds
+Notice: /Stage[main]/Main/File[/tmp/tonytest.txt]/ensure: defined content as '{md5}9fbae0c049b280b2cc1a056e7a801f4e'
+Notice: Applied catalog in 0.01 seconds
+</code></pre>
+
+<p>Which applies the file with the content expected:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/examples$ cat /tmp/tonytest.txt
+Hi there,
+My name is AJ9
+</code></pre>
+
+<p>Changing the <code>ensure =&gt; file</code> to <code>ensure =&gt; absent</code> will remove the file.</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/examples$ cat /tmp/tonytest.txt
+cat: /tmp/tonytest.txt: No such file or directory
+</code></pre>
+
+<p>Examples:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/examples$ sudo puppet apply --noop --show_diff /examples/file_tonytest.pp
+Notice: Compiled catalog for ubuntu-xenial.ocado.com in environment production in 0.01 seconds
+Notice: /Stage[main]/Main/File[/tmp/tonytest.txt]/content:
+--- /tmp/tonytest.txt   2018-10-16 09:38:58.358787401 +0000
++++ /tmp/puppet-file20181016-28487-1ejofut  2018-10-16 09:39:13.902787401 +0000
+@@ -1,2 +1,2 @@
+ Hi there,
+-My name is Freya
++My name is AJ9
+
+Notice: /Stage[main]/Main/File[/tmp/tonytest.txt]/content: current_value '{md5}366b6b35868ee843d3cd5c4368104055', should be '{md5}9fbae0c049b280b2cc1a056e7a801f4e' (noop)
+Notice: Class[Main]: Would have triggered 'refresh' from 1 event
+Notice: Stage[main]: Would have triggered 'refresh' from 1 event
+Notice: Applied catalog in 0.02 seconds
+vagrant@ubuntu-xenial:/examples$ sudo puppet apply /examples/file_tonytest.pp
+Notice: Compiled catalog for ubuntu-xenial.ocado.com in environment production in 0.01 seconds
+Notice: /Stage[main]/Main/File[/tmp/tonytest.txt]/content: content changed '{md5}366b6b35868ee843d3cd5c4368104055' to '{md5}9fbae0c049b280b2cc1a056e7a801f4e'
+Notice: Applied catalog in 0.03 seconds
+vagrant@ubuntu-xenial:/examples$ cat /tmp/tonytest.txt
+Hi there,
+My name is AJ9
+</code></pre>
+
+<h4 id="managingpackages">Managing Packages</h4>
+
+<p>Another key resource type in Puppet is the <strong>package</strong>. A major part of configuring servers by hand involves installing packages, so we will also be using packages a lot in Puppet manifests. </p>
+
+<p>Although every operating system has its own package format, and different formats vary quite a lot in their capabilities, Puppet represents all these possibilities with a single <code>package</code> type. </p>
+
+<p>If you specify in your Puppet manifest that a given package should be installed, Puppet will use the appropriate package manager commands to install it on whatever platform it&#8217;s running on.</p>
+
+<p>As you&#8217;ve seen, all resource declarations in Puppet follow this form:</p>
+
+<pre><code class="Shell">RESOURCE_TYPE { TITLE:
+  ATTRIBUTE =&gt; VALUE,
+  ...
+}
+</code></pre>
+
+<p><code>package</code> resources are no different. The <code>RESOURCE_TYPE</code> is <code>package</code>, and the only attribute you usually need to specify is <code>ensure</code>, and the only value it usually needs to take is <code>installed</code>:</p>
+
+<pre><code class="Shell">package { 'cowsay':
+  ensure =&gt; installed,
+}
+</code></pre>
+
+<p>For example:</p>
+
+<pre><code class="Shell">sudo puppet apply /examples/package.pp
+Notice: Compiled catalog for ubuntu-xenial in environment production in 0.52 seconds
+Notice: /Stage[main]/Main/Package[cowsay]/ensure: created
+Notice: Applied catalog in 29.53 seconds
+</code></pre>
+
+<p>Let&#8217;s see whether <code>cowsay</code> is installed:</p>
+
+<pre><code class="Shell">cowsay Puppet rules!
+ _______________
+&lt; Puppet rules! &gt;
+ ---------------
+        \   ^__^
+         \  (oo)\_______
+            (__)\       )\/\
+                ||----w |
+                ||     ||
+</code></pre>
+
+<p>Not the most useful package, but it demonstrates the principle.</p>
+
+<p>As in:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/examples$ cat package.pp
+package { 'cowsay':
+  ensure =&gt; installed,
+}
+
+vagrant@ubuntu-xenial:/examples$ sudo puppet apply /examples/package.pp
+Notice: Compiled catalog for ubuntu-xenial.ocado.com in environment production in 0.42 seconds
+Notice: /Stage[main]/Main/Package[cowsay]/ensure: created
+Notice: Applied catalog in 1.52 seconds
+
+vagrant@ubuntu-xenial:/examples$ cowsay Hello Tony!
+ _____________
+&lt; Hello Tony! &gt;
+ -------------
+        \   ^__^
+         \  (oo)\_______
+            (__)\       )\/\
+                ||----w |
+                ||     ||
+</code></pre>
+
+<h5 id="howpuppetappliesthemanifest-package">How puppet applies the manifest - Package</h5>
+
+<p>The title of the <code>package</code> resource is <code>cowsay</code>, so Puppet knows that we&#8217;re talking about a package named <code>cowsay</code>.</p>
+
+<p>The <code>ensure</code> attribute governs the installation state of packages: unsurprisingly, <code>installed </code>tells Puppet that the package should be installed.</p>
+
+<p>As we saw in the earlier example, Puppet processes this manifest by examining each resource in turn and checking its attributes on the server against those specified in the manifest. </p>
+
+<p>In this case, Puppet will look for the <code>cowsay</code> package to see whether it&#8217;s installed. It is not, but the manifest says it should be, so Puppet carries out all the necessary actions to make reality match the manifest, which here means installing the package.</p>
+
+<h5 id="exercise">Exercise</h5>
+
+<p>Create a manifest that uses the <code>package</code> resource to install any software you find useful for managing servers. </p>
+
+<p>Here are some suggestions: <code>tmux</code>, <code>sysdig</code>, <code>atop</code>, <code>htop</code>, and <code>dstat</code>.</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/examples$ cat package_manage_servers.pp
+package { 'tmux':
+    ensure  =&gt; installed,
+}
+
+package { 'sysdig':
+    ensure  =&gt; installed,
+}
+
+package { 'atop':
+    ensure  =&gt; installed,
+}
+
+package { 'htop':
+    ensure  =&gt; installed,
+}
+
+package { 'dstat':
+    ensure  =&gt; installed,
+}
+</code></pre>
+
+<p>Which produced:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/examples$ sudo puppet apply /examples/package_manage_servers.pp
+Notice: Compiled catalog for ubuntu-xenial.ocado.com in environment production in 0.44 seconds
+Notice: /Stage[main]/Main/Package[sysdig]/ensure: created
+Notice: /Stage[main]/Main/Package[atop]/ensure: created
+Notice: /Stage[main]/Main/Package[htop]/ensure: created
+Notice: /Stage[main]/Main/Package[dstat]/ensure: created
+Notice: Applied catalog in 23.02 seconds
+</code></pre>
+
+<h4 id="queryingresourceswiththepuppetresource">Querying resources with the puppet resource</h4>
+
+<p>If you want to see what version of a package Puppet thinks you have installed, you can use the <code>puppet resource</code> tool:</p>
+
+<pre><code class="Shell">puppet resource package openssl
+package { 'openssl':
+  ensure =&gt; '1.0.2g-1ubuntu4.8',
+}
+</code></pre>
+
+<p><code>puppet resource TYPE TITLE</code> will output a Puppet manifest representing the current state of the named resource on the system. </p>
+
+<p>If you leave out <code>TITLE</code>, you&#8217;ll get a manifest for all the resources of the type <code>TYPE</code>. </p>
+
+<p>For example, if you run <code>puppet resource package</code>, you&#8217;ll see the Puppet code for all the packages installed on the system.</p>
+
+<p><code>puppet resource</code> even has an interactive configuration feature. </p>
+
+<p>To use it, run the following command:</p>
+
+<pre><code class="Shell">puppet resource -e package openssl
+</code></pre>
+
+<p>If you run this, Puppet will generate a manifest for the current state of the resource, and open it in an editor. </p>
+
+<p>If you now make changes and save it, Puppet will apply that manifest to make changes to the system. This is a fun little feature, but it would be rather time-consuming to do your entire configuration this way.</p>
+
+<p>In an editor you would get:</p>
+
+<pre><code>package { 'openssl':
+  ensure =&gt; '1.0.2g-1ubuntu4.13',
+}
+</code></pre>
+
+<h4 id="services">Services</h4>
+
+<p>The third most important Puppet resource type is the <strong>service</strong>: a long-running process that either does some continuous kind of work, or waits for requests and then acts on them. </p>
+
+<p>For example, on most systems, the <code>sshd</code> process runs all the time and listens for SSH login attempts.</p>
+
+<p>Puppet models services with the <code>service</code> resource type. The <code>service</code> resources look like the following example (you can find this in <code>service.pp</code> in the <code>/examples/</code> directory. </p>
+
+<p>From now on, I&#8217;ll just give the filename of each example, as they are all in the same directory):</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/examples$ more service.pp
+service { 'sshd':
+  ensure =&gt; running,
+  enable =&gt; true,
+}
+</code></pre>
+
+<p>The <code>ensure</code> parameter governs whether the service should be running or not. </p>
+
+<p>If its value is <code>running</code>, then as you might expect, Puppet will start the service if it is not running. </p>
+
+<p>If you set <code>ensure</code> to <code>stopped</code>, Puppet will stop the service if it is running.</p>
+
+<p>Services may also be set to start when the system boots, using the <code>enable</code> parameter. </p>
+
+<p>If <code>enable</code> is set to <code>true</code>, the service will start at boot. If, on the other hand, <code>enable</code> is set to <code>false</code>, it will not. </p>
+
+<p>Generally speaking, unless there&#8217;s a good reason not to, all services should be set to start at boot.</p>
+
+<h5 id="gettinghelponresourceswithpuppetdescribe">Getting help on resources with puppet describe</h5>
+
+<p>If you&#8217;re struggling to remember all the different attributes of all the different resources, Puppet has a built-in help feature that will remind you. </p>
+
+<p>Run the following command, for example:</p>
+
+<pre><code class="Shell">puppet describe service
+</code></pre>
+
+<p>This will give a description of the <code>service</code> resource, along with a complete list of attributes and allowed values. </p>
+
+<p>This works for all built-in resource types as well as many provided by third-party modules. To see a list of all the available resource types, run the following command:</p>
+
+<pre><code class="Shell">puppet describe --list
+</code></pre>
+
+<p>As in:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/examples$ puppet describe --list
+These are the types known to puppet:
+augeas          - Apply a change or an array of changes to the  ...
+cron            - Installs and manages cron jobs
+exec            - Executes external commands
+file            - Manages files, including their content, owner ...
+filebucket      - A repository for storing and retrieving file  ...
+group           - Manage groups
+host            - Installs and manages host entries
+mount           - Manages mounted filesystems, including puttin ...
+notify          - .. no documentation ..
+package         - Manage packages
+resources       - This is a metatype that can manage other reso ...
+schedule        - Define schedules for Puppet
+scheduled_task  - Installs and manages Windows Scheduled Tasks
+selboolean      - Manages SELinux booleans on systems with SELi ...
+selmodule       - Manages loading and unloading of SELinux poli ...
+service         - Manage running services
+ssh_authorized_key - Manages SSH authorized keys
+sshkey          - Installs and manages ssh host keys
+stage           - A resource type for creating new run stages
+tidy            - Remove unwanted files based on specific crite ...
+user            - Manage users
+whit            - Whits are internal artifacts of Puppet's curr ...
+yumrepo         - The client-side description of a yum reposito ...
+zfs             - Manage zfs
+zone            - Manages Solaris zones
+zpool           - Manage zpools
+</code></pre>
+
+<h6 id="crondescribed">Cron Described</h6>
+
+<pre><code class="vagrant@ubuntu-xenial:/examples$ puppet describe cron">
+cron
+====
+Installs and manages cron jobs. Every cron resource created by Puppet
+requires a command and at least one periodic attribute (hour, minute,
+month, monthday, weekday, or special). While the name of the cron job is
+not part of the actual job, the name is stored in a comment beginning with
+`# Puppet Name: `. These comments are used to match crontab entries created
+by Puppet with cron resources.
+If an existing crontab entry happens to match the scheduling and command of
+a
+cron resource that has never been synced, Puppet defers to the existing
+crontab entry and does not create a new entry tagged with the `# Puppet
+Name: `
+comment.
+Example:
+    cron { 'logrotate':
+      command =&gt; '/usr/sbin/logrotate',
+      user    =&gt; 'root',
+      hour    =&gt; 2,
+      minute  =&gt; 0,
+    }
+Note that all periodic attributes can be specified as an array of values:
+    cron { 'logrotate':
+      command =&gt; '/usr/sbin/logrotate',
+      user    =&gt; 'root',
+      hour    =&gt; [2, 4],
+    }
+...or using ranges or the step syntax `*/2` (although there's no guarantee
+that your `cron` daemon supports these):
+    cron { 'logrotate':
+      command =&gt; '/usr/sbin/logrotate',
+      user    =&gt; 'root',
+      hour    =&gt; ['2-4'],
+      minute  =&gt; '*/10',
+    }
+**Important:** _The Cron type will not reset parameters that are
+removed from a manifest_. For example, removing a `minute =&gt; 10` parameter
+will not reset the minute component of the associated cronjob to `*`.
+These changes must be expressed by setting the parameter to
+`minute =&gt; absent` because Puppet only manages parameters that are out of
+sync with manifest entries.
+**Autorequires:** If Puppet is managing the user account specified by the
+`user` property of a cron resource, then the cron resource will autorequire
+that user.
+
+
+Parameters
+----------
+
+- **command**
+    The command to execute in the cron job.  The environment
+    provided to the command varies by local system rules, and it is
+    best to always provide a fully qualified command.  The user's
+    profile is not sourced when the command is run, so if the
+    user's environment is desired it should be sourced manually.
+    All cron parameters support `absent` as a value; this will
+    remove any existing values for that field.
+
+- **ensure**
+    The basic property that the resource should be in.
+    Valid values are `present`, `absent`.
+
+- **environment**
+    Any environment settings associated with this cron job.  They
+    will be stored between the header and the job in the crontab.  There
+    can be no guarantees that other, earlier settings will not also
+    affect a given cron job.
+    Also, Puppet cannot automatically determine whether an existing,
+    unmanaged environment setting is associated with a given cron
+    job.  If you already have cron jobs with environment settings,
+    then Puppet will keep those settings in the same place in the file,
+    but will not associate them with a specific job.
+
+    Settings should be specified exactly as they should appear in
+    the crontab, like `PATH=/bin:/usr/bin:/usr/sbin`.
+
+
+- **hour**
+    The hour at which to run the cron job. Optional;
+    if specified, must be between 0 and 23, inclusive.
+
+- **minute**
+    The minute at which to run the cron job.
+    Optional; if specified, must be between 0 and 59, inclusive.
+
+- **month**
+    The month of the year. Optional; if specified,
+    must be either:
+    -   A number between 1 and 12, inclusive, with 1 being January
+    -   The name of the month, such as 'December'.
+
+- **monthday**
+    The day of the month on which to run the
+    command.  Optional; if specified, must be between 1 and 31.
+
+- **name**
+    The symbolic name of the cron job.  This name
+    is used for human reference only and is generated automatically
+    for cron jobs found on the system.  This generally won't
+    matter, as Puppet will do its best to match existing cron jobs
+    against specified jobs (and Puppet adds a comment to cron jobs it adds),
+    but it is at least possible that converting from unmanaged jobs to
+    managed jobs might require manual intervention.
+
+- **special**
+    A special value such as 'reboot' or 'annually'.
+    Only available on supported systems such as Vixie Cron.
+    Overrides more specific time of day/week settings.
+    Set to 'absent' to make puppet revert to a plain numeric schedule.
+
+- **target**
+    The name of the crontab file in which the cron job should be stored.
+    This property defaults to the value of the `user` property if set, the
+    user running Puppet or `root`.
+    For the default crontab provider, this property is functionally
+    equivalent to the `user` property and should be avoided. In particular,
+    setting both `user` and `target` to different values will result in
+    undefined behavior.
+
+- **user**
+    The user who owns the cron job.  This user must
+    be allowed to run cron jobs, which is not currently checked by
+    Puppet.
+    This property defaults to the user running Puppet or `root`.
+    The default crontab provider executes the system `crontab` using
+    the user account specified by this property.
+
+- **weekday**
+    The weekday on which to run the command. Optional; if specified,
+    must be either:
+    -   A number between 0 and 7, inclusive, with 0 or 7 being Sunday
+    -   The name of the day, such as 'Tuesday'.
+
+Providers
+---------
+    Crontab
+</code></pre>
+
+<h6 id="service">Service</h6>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/examples$ puppet describe service
+
+service
+=======
+Manage running services.  Service support unfortunately varies
+widely by platform --- some platforms have very little if any concept of a
+running service, and some have a very codified and powerful concept.
+Puppet's service support is usually capable of doing the right thing, but
+the more information you can provide, the better behaviour you will get.
+Puppet 2.7 and newer expect init scripts to have a working status command.
+If this isn't the case for any of your services' init scripts, you will
+need to set `hasstatus` to false and possibly specify a custom status
+command in the `status` attribute. As a last resort, Puppet will attempt to
+search the process table by calling whatever command is listed in the `ps`
+fact. The default search pattern is the name of the service, but you can
+specify it with the `pattern` attribute.
+**Refresh:** `service` resources can respond to refresh events (via
+`notify`, `subscribe`, or the `~&gt;` arrow). If a `service` receives an
+event from another resource, Puppet will restart the service it manages.
+The actual command used to restart the service depends on the platform and
+can be configured:
+* If you set `hasrestart` to true, Puppet will use the init script's restart
+command.
+* You can provide an explicit command for restarting with the `restart`
+attribute.
+* If you do neither, the service's stop and start commands will be used.
+
+
+Parameters
+----------
+
+- **binary**
+    The path to the daemon.  This is only used for
+    systems that do not support init scripts.  This binary will be
+    used to start the service if no `start` parameter is
+provided.
+
+- **control**
+    The control variable used to manage services (originally for HP-UX).
+    Defaults to the upcased service name plus `START` replacing dots with
+    underscores, for those providers that support the `controllable`
+    feature.
+
+- **enable**
+    Whether a service should be enabled to start at boot.
+    This property behaves quite differently depending on the platform;
+    wherever possible, it relies on local tools to enable or disable
+    a given service.
+    Valid values are `true`, `false`, `manual`, `mask`.
+    Requires features enableable.
+
+- **ensure**
+    Whether a service should be running.
+    Valid values are `stopped` (also called `false`), `running` (also called
+    `true`).
+
+- **flags**
+    Specify a string of flags to pass to the startup script.
+    Requires features flaggable.
+
+- **hasrestart**
+    Specify that an init script has a `restart` command.  If this is
+    false and you do not specify a command in the `restart` attribute,
+    the init script's `stop` and `start` commands will be used.
+    Valid values are `true`, `false`.
+
+- **hasstatus**
+    Declare whether the service's init script has a functional status
+    command. This attribute's default value changed in Puppet 2.7.0.
+    The init script's status command must return 0 if the service is
+    running and a nonzero value otherwise. Ideally, these exit codes
+    should conform to [the LSB's specification][lsb-exit-codes] for init
+    script status actions, but Puppet only considers the difference
+    between 0 and nonzero to be relevant.
+    If a service's init script does not support any kind of status command,
+    you should set `hasstatus` to false and either provide a specific
+    command using the `status` attribute or expect that Puppet will look for
+    the service name in the process table. Be aware that 'virtual' init
+    scripts (like 'network' under Red Hat systems) will respond poorly to
+    refresh events from other resources if you override the default behavior
+    without providing a status command.
+Valid values are `true`, `false`.
+
+- **manifest**
+    Specify a command to config a service, or a path to a manifest to do so.
+
+- **name**
+    The name of the service to run.
+    This name is used to find the service; on platforms where services
+    have short system names and long display names, this should be the
+    short name. (To take an example from Windows, you would use &quot;wuauserv&quot;
+    rather than &quot;Automatic Updates.&quot;)
+
+- **path**
+    The search path for finding init scripts.  Multiple values should
+    be separated by colons or provided as an array.
+
+- **pattern**
+    The pattern to search for in the process table.
+    This is used for stopping services on platforms that do not
+    support init scripts, and is also used for determining service
+    status on those service whose init scripts do not include a status
+    command.
+    Defaults to the name of the service. The pattern can be a simple string
+    or any legal Ruby pattern, including regular expressions (which should
+    be quoted without enclosing slashes).
+
+- **restart**
+    Specify a *restart* command manually.  If left
+    unspecified, the service will be stopped and then started.
+
+- **start**
+    Specify a *start* command manually.  Most service subsystems
+    support a `start` command, so this will not need to be
+specified.
+
+- **status**
+    Specify a *status* command manually.  This command must
+    return 0 if the service is running and a nonzero value otherwise.
+    Ideally, these exit codes should conform to [the LSB's
+    specification][lsb-exit-codes] for init script status actions, but
+    Puppet only considers the difference between 0 and nonzero to be
+    relevant.
+    If left unspecified, the status of the service will be determined
+    automatically, usually by looking for the service in the process
+    table.
+    [lsb-exit-codes]:
+    http://refspecs.linuxfoundation.org/LSB_4.1.0/LSB-Core-generic/LSB-Core-
+    generic/iniscrptact.html
+
+- **stop**
+    Specify a *stop* command manually.
+
+Providers
+---------
+    base, bsd, daemontools, debian, freebsd, gentoo, init, launchd, openbsd,
+    openrc, openwrt, rcng, redhat, runit, service, smf, src, systemd,
+    upstart, windows
+</code></pre>
+
+<h5 id="thepackage-file-servicepattern">The package-file-service pattern</h5>
+
+<p>It&#8217;s very common for a given piece of software to require all three of the above mentioned Puppet resource types: the <code>package</code> resource installs the software, the <code>file</code> resource deploys one or more configuration files required for the software, and the <code>service</code> resource runs the software itself.</p>
+
+<p>Here&#8217;s an example using the MySQL database server (<code>package_file_service.pp</code>):</p>
+
+<pre><code class="Shell">package { 'mysql-server':
+  ensure =&gt; installed,
+  notify =&gt; Service['mysql'],
+}
+
+file { '/etc/mysql/mysql.cnf':
+  source =&gt; '/examples/files/mysql.cnf',
+  notify =&gt; Service['mysql'],
+}
+
+service { 'mysql':
+  ensure =&gt; running,
+  enable =&gt; true,
+}
+</code></pre>
+
+<p>The <code>package</code> resource makes sure the <code>mysql-server</code> package is installed.</p>
+
+<p>The config file for MySQL is <code>/etc/mysql/mysql.cnf</code>, and we use a <code>file</code> resource to copy this file from the Puppet repo so that we can control MySQL settings.</p>
+
+<p>Finally, the <code>service</code> resource ensures that the <code>mysql</code> service is running.</p>
+
+<p>Which when run does this:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/examples$ sudo puppet apply /examples/package_file_service.pp
+Notice: Compiled catalog for ubuntu-xenial.ocado.com in environment production in 0.57 seconds
+Notice: /Stage[main]/Main/Package[mysql-server]/ensure: created
+Notice: /Stage[main]/Main/File[/etc/mysql/mysql.cnf]/content: content changed '{md5}f5d3113b607567fd2ce955f4279fa9ce' to '{md5}9bb1147c6f1df1220a7467a0acb17801'
+Notice: /Stage[main]/Main/Service[mysql]: Triggered 'refresh' from 2 events
+Notice: Applied catalog in 19.48 seconds
+</code></pre>
+
+<p>Proven with:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/examples$ more /etc/mysql/mysql.cnf
+!includedir /etc/mysql/conf.d/
+!includedir /etc/mysql/mysql.conf.d/
+vagrant@ubuntu-xenial:/examples$ ps -ef | grep mysql
+mysql     3340     1  0 10:58 ?        00:00:00 /usr/sbin/mysqld
+vagrant   3380 27556  0 10:59 pts/0    00:00:00 grep --color=auto mysql
+</code></pre>
+
+<h5 id="notifyingalinkedresource">Notifying a linked resource</h5>
+
+<p>You might have noticed a new attribute, called <code>notify</code>, in the <code>file</code> resource in the previous example:</p>
+
+<pre><code class="Shell">file { '/etc/mysql/mysql.cnf':
+  source =&gt; '/examples/files/mysql.cnf',
+  notify =&gt; Service['mysql'],
+}
+</code></pre>
+
+<p>What does this do? </p>
+
+<p>Imagine you&#8217;ve made a change to the <code>mysql.cnf</code> file and applied this change with Puppet. </p>
+
+<p>The updated file will be written to a disk, but because the <code>mysql</code> service is already running, it has no way of knowing that its config file has changed. </p>
+
+<p>Therefore, your changes will not actually take effect until the service is restarted. However, Puppet can do this for you if you specify the <code>notify</code> attribute on the <code>file</code> resource. </p>
+
+<p>The value of <code>notify</code> is the resource to notify about the change, and what that involves depends on the type of resource that&#8217;s being notified. </p>
+
+<p>When it&#8217;s a service, the default action is to restart the service</p>
+
+<p>Usually, with the package-file-service pattern, the file notifies the service, so whenever Puppet changes the contents of the file, it will restart the notified service to pick up the new configuration. </p>
+
+<p>If there are several files that affect the service, they should all notify the service, and Puppet is smart enough to only restart the service once, however many dependent resources are changed.</p>
+
+<p>The name of the resource to notify is specified as the resource type, capitalised, followed by the resource title, which is quoted and within square brackets: <code>Service['mysql’]</code>.</p>
+
+<p>Proven with:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/examples/files$ cat mysql.cnf
+!includedir /etc/mysql/conf.d/
+!includedir /etc/mysql/tonytest/
+!includedir /etc/mysql/mysql.conf.d/
+</code></pre>
+
+<p>Which generated (chopped):</p>
+
+<pre><code class="Shell">journalctl log for mysql:
+-- Logs begin at Tue 2018-10-16 08:01:48 UTC, end at Tue 2018-10-16 11:08:19 UTC. --
+Oct 16 11:06:45 ubuntu-xenial systemd[1]: Stopping MySQL Community Server...
+Oct 16 11:06:47 ubuntu-xenial systemd[1]: Stopped MySQL Community Server.
+Oct 16 11:06:47 ubuntu-xenial systemd[1]: Starting MySQL Community Server...
+</code></pre>
+
+<h5 id="resourceorderingwithrequire">Resource ordering with require</h5>
+
+<p>In the package-file-service example, we declared three resources: the <code>mysql-server</code> package, the <code>/etc/mysql/mysql.cnf</code> file, and the <code>mysql</code> service. </p>
+
+<p>If you think about it, they need to be applied in that order. Without the <code>mysql-server</code> package installed, there will be no <code>/etc/mysql/</code> directory to put the <code>mysql.cnf</code> file in. Without the package or the config file, the <code>mysql</code> service won&#8217;t be able to run.</p>
+
+<p>A perfectly reasonable question to ask is, &#8220;Does Puppet apply resources in the same order in which they&#8217;re declared in the manifest?&#8221; The answer is usually yes, unless you explicitly specify a different order, using the <code>require</code> attribute.</p>
+
+<p>All resources support the <code>require</code> attribute, and its value is the name of another resource declared somewhere in the manifest, specified in the same way as when using <code>notify</code>. </p>
+
+<p>Here&#8217;s the package-file-service example again, this time with the resource ordering specified explicitly using <code>require</code> - that is <code>(package_file_service_require.pp)</code>:</p>
+
+<pre><code class="Shell">package { 'mysql-server':
+  ensure =&gt; installed,
+}
+
+file { '/etc/mysql/mysql.cnf':
+  source  =&gt; '/examples/files/mysql.cnf',
+  notify  =&gt; Service['mysql'],
+  require =&gt; Package['mysql-server'],
+}
+
+service { 'mysql':
+  ensure  =&gt; running,
+  enable  =&gt; true,
+  require =&gt; [Package['mysql-server'], File['/etc/mysql/mysql.cnf']],
+}
+</code></pre>
+
+<p>You can see that the <code>mysql.cnf</code> resource requires the <code>mysql-server</code> package. The <code>mysql</code> service requires both the other resources, listed as an array within square brackets.</p>
+
+<p>When resources are already in the right order, you don&#8217;t need to use <code>require</code>, as Puppet will apply the resources in the order you declare them. However, it can be useful to specify an ordering explicitly, for the benefit of those reading the code, especially when there are lots of resources in a manifest file.</p>
+
+<p>In older versions of Puppet, resources were applied in a more or less arbitrary order, so it was much more important to express dependencies using <code>require</code>. Nowadays, you won&#8217;t need to use it very much, and you&#8217;ll mostly come across it in legacy code.</p>
+
+<h4 id="summary">Summary</h4>
+
+<p>In this chapter, we&#8217;ve seen how a manifest is made up of Puppet resources. You&#8217;ve learned how to use Puppet&#8217;s <code>file</code> resource to create and modify files, how to install packages using the <code>package</code> resource, and how to manage services with the <code>service</code> resource. We&#8217;ve looked at the common package-file-service pattern and seen how to use the <code>notify</code> attribute on a resource to send a message to another resource indicating that its configuration has been updated. We&#8217;ve covered the use of the <code>require</code> attribute to make dependencies between resources explicit, when necessary.</p>
+
+<p>You&#8217;ve also learned to use <code>puppet resource</code> to inspect the current state of the system according to Puppet, and <code>puppet describe</code> to get command-line help on all Puppet resources. To check what Puppet would change on the system without actually changing it, we&#8217;ve introduced the <code>—noop</code> and <code>—show_diff</code> options to <code>puppet apply</code>.</p>
+
+<p>In the next chapter, we&#8217;ll see how to use the version control tool Git to keep track of your manifests, we&#8217;ll get an introduction to fundamental Git concepts, such as the repo and the commit, and you&#8217;ll learn how to distribute your code to each of the servers you&#8217;re going to manage with Puppet.</p>
+
+<h3 id="chapter3-managingyourpuppetcodewithgit">Chapter 3 - Managing your Puppet code with Git</h3>
+
+<p>In this chapter, we’ll learn how to use the Git version control system to manage your Puppet manifests. </p>
+
+<p>We’ll also learn how to use Git to distribute the manifests to multiple nodes, so that you can start managing your whole network with Puppet.</p>
+
+<h4 id="whatisversioncontrol">What is version control?</h4>
+
+<p>Even if you&#8217;re the only person who works on a piece of source code (for example, Puppet manifests), it&#8217;s still useful to be able to see what changes you made, and when. </p>
+
+<p>For example, you might realise that you introduced a bug at some point in the past, and you need to examine exactly when a certain file was modified and exactly what the change was. </p>
+
+<p>A version control system lets you do that, by keeping a complete history of the changes you&#8217;ve made to a set of files over time.</p>
+
+<h5 id="trackingchanges">Tracking Changes</h5>
+
+<p>When you&#8217;re working on code with others, you also need a way to communicate with the rest of the team about your changes. </p>
+
+<p>A version control tool such as Git not only tracks everyone&#8217;s changes, but lets you record a <strong>commit message</strong>, explaining what you did and why. </p>
+
+<p>The following example illustrates some aspects of a good commit message:</p>
+
+<pre><code class="Shell">Summarize changes in around 50 characters or less
+
+More detailed explanatory text, if necessary. Wrap it to about 72
+characters or so. In some contexts, the first line is treated as
+the subject of the commit and the rest of the text as the body.
+The blank line separating the summary from the body is critical
+(unless you omit the body entirely); various tools like `log`,
+`shortlog`, and `rebase` can get confused if you run the two together.
+
+Explain the problem that this commit is solving. Focus on why you
+are making this change as opposed to how (the code explains that).
+Are there side effects or other unintuitive consequences of this
+change? Here's the place to explain them.
+
+Further paragraphs come after blank lines.
+
+ - Bullet points are okay, too
+
+ - Typically a hyphen or asterisk is used for the bullet, preceded
+   by a single space, with blank lines in between, but conventions
+   vary here
+
+If you use an issue tracker, put references to them at the bottom,
+like this:
+
+Resolves: #123
+See also: #456, #789
+</code></pre>
+
+<p>Git also records when the change happened, who made it, what files were changed, added, or deleted, and which lines were added, altered, or removed. </p>
+
+<p>As you can imagine, if you&#8217;re trying to track down a bug, and you can see a complete history of changes to the code, that&#8217;s a big help. It also means you can, if necessary, roll back the state of the code to any point in history and examine it.</p>
+
+<p>You might think this introduces a lot of extra complication. In fact, it&#8217;s very simple. Git keeps out of your way until you need it, and all you have to do is write a commit message when you decide to record changes to the code.</p>
+
+<h5 id="sharingcode">Sharing Code</h5>
+
+<p>A set of files under Git version control is called a <strong>repository</strong>, which is usually equivalent to a project. </p>
+
+<p>A Git repository (from now on, just <strong>repo</strong>) is also a great way to distribute your code to others, whether privately or publicly, so that they can use it, modify it, contribute changes back to you, or develop it in a different direction for their own requirements. </p>
+
+<p>The public GitHub repo for this book which we looked at in Chapter 1, _Getting started with Puppet_ is a good example of this. You&#8217;ll be able to use this repo for working through examples throughout the book, but you can also use it for help and inspiration when building Puppet manifests for your own infrastructure.</p>
+
+<p>Because Git is so important for managing Puppet code, it&#8217;s a good idea to get familiar with it, and the only way to do that is to use it for real. So let&#8217;s start a new Git repo we can use to experiment with.</p>
+
+<h4 id="creatingagitrepo">Creating a Git repo</h4>
+
+<p>It&#8217;s very easy to create a Git repo. Follow these steps:</p>
+
+<ul>
+<li>Make a directory to hold your versioned files using the following commands:</li>
+</ul>
+
+<pre><code class="Shell">cd
+mkdir puppet
+</code></pre>
+
+<p>Now run the following commands to turn the directory into a Git repo:</p>
+
+<pre><code class="Shell">cd puppet
+git init
+Initialized empty Git repository in /home/ubuntu/puppet/.git/
+</code></pre>
+
+<p> As in:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:~$ pwd
+/home/vagrant
+vagrant@ubuntu-xenial:~$ ls
+puppet-release-xenial.deb
+vagrant@ubuntu-xenial:~$ mkdir puppet
+vagrant@ubuntu-xenial:~$ cd puppet
+vagrant@ubuntu-xenial:~/puppet$ git init
+Initialized empty Git repository in /home/vagrant/puppet/.git/
+</code></pre>
+
+<h5 id="makingyourfirstcommit">Making your first commit</h5>
+
+<p>You can change the files in your repo as much as you like, but Git will not know about the changes until you make what&#8217;s called a <strong>commit</strong>. </p>
+
+<p>You can think of a commit as being like a snapshot of the repo at a particular moment, but it also stores information about what changed in the repo since the previous commit. </p>
+
+<p>Commits are stored forever, so you will always be able to roll back the repo to the state it was in at a certain commit, or show what files were changed in a past commit and compare them to the state of the repo at any other commit.</p>
+
+<p>Let&#8217;s make our first commit to the new repo.</p>
+
+<p>Because Git records not only changes to the code, but also who made them, it needs to know who you are. </p>
+
+<ol>
+<li>Set your identification details for Git (use your own name and email address, unless you particularly prefer mine) using the following commands:</li>
+</ol>
+
+<p><code>Shell
+git config --global user.name “AJ9”
+git config --global user.email anthony@junipernine.com
+</code> 
+2. It is traditional for Git repos to have a <strong>README</strong> file, which explains what&#8217;s in the repo and how to use it. For the moment, let&#8217;s just create this file with a placeholder message:</p>
+
+<pre><code class="Shell">echo &quot;Watch this space... coming soon!&quot; &gt;README.md
+</code></pre>
+
+<ol>
+<li>Run the following command:</li>
+</ol>
+
+<pre><code class="Shell">git status
+
+On branch master
+Initial commit
+Untracked files:
+  (use &quot;git add &lt;file&gt;...&quot; to include in what will be committed)
+        README.md
+nothing added to commit but untracked files present (use &quot;git add&quot; to track)
+</code></pre>
+
+<ol>
+<li>Because we&#8217;ve added a new file to the repo, changes to it won&#8217;t be tracked by Git unless we explicitly tell it to. We do this by using the <code>git add</code> command, as follows:</li>
+</ol>
+
+<pre><code class="Shell">git add README.md
+</code></pre>
+
+<ol>
+<li>Git now knows about this file, and changes to it will be included in the next commit. We can check this by running <code>git status</code> again:</li>
+</ol>
+
+<pre><code class="Shell">git status
+
+On branch master
+Initial commit
+Changes to be committed:
+  (use &quot;git rm --cached &lt;file&gt;...&quot; to unstage)
+        new file:   README.md
+</code></pre>
+
+<ol>
+<li>The file is listed under <code>Changes to be committed</code>, so we can now actually make the commit:</li>
+</ol>
+
+<pre><code class="Shell">git commit -m 'Add README file'
+
+[master (root-commit) ee21595] Add README file
+ 1 file changed, 1 insertion(+)
+ create mode 100644 README.md
+</code></pre>
+
+<p><strong>NB.</strong> The -m allows you to add the commit message on the command line rather than being put into a vi editor to apply it.</p>
+
+<ol>
+<li>You can always see the complete history of commits in a repo by using the <code>git log</code> command.</li>
+</ol>
+
+<p>Run this now to see the commit you just made:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:~/puppet$ git log
+commit 48522513039084b24cbddc9b8245f456acfe1f5a
+Author: AJ9 &lt;anthony@junipernine.com&gt;
+Date:   Tue Oct 16 12:32:04 2018 +0000
+
+    Add README file
+</code></pre>
+
+<h5 id="howoftenshouldicommit">How often should I commit</h5>
+
+<p>A common practice is to commit when the code is in a consistent, working state, and have the commit include a set of related changes made for some particular purpose. </p>
+
+<p>So, for example, if you are working to fix bug number 75 in your issue-tracking system, you might make changes to quite a few separate files and then, once you&#8217;re happy the work is complete, make a single commit.</p>
+
+<p>On the other hand, if you are making a large number of complicated changes and you are not sure when you&#8217;ll be done, it might be wise to make a few separate commits along the way, so that if necessary you can roll the code back to a previous state. </p>
+
+<p>Commits cost nothing, so when you feel a commit is needed, go ahead and make it.</p>
+
+<h5 id="branching">Branching</h5>
+
+<p>Git has a powerful feature called <strong>branching</strong>, which lets you create a parallel copy of the code (a branch) and make changes to it independently. </p>
+
+<p>At any time, you can choose to merge those changes back into the master branch. Or, if changes have been made to the master branch in the meantime, you can incorporate those into your working branch and carry on.</p>
+
+<p>This is extremely useful when working with Puppet, because it means you can switch a single node to your branch while you&#8217;re testing it and working on it. </p>
+
+<p>The changes you make won&#8217;t be visible to other nodes which aren&#8217;t on your branch, so there&#8217;s no danger of accidentally rolling out changes before you&#8217;re ready.</p>
+
+<p>Once you&#8217;re done, you can merge your changes back into master and have them roll out to all nodes.</p>
+
+<p>Similarly, two or more people can work independently on their own branches, exchanging individual commits with each other and with the master branch as they choose. This is a very flexible and useful way of working.</p>
+
+<p>Check out the Git Tutorial for more info.</p>
+
+<h4 id="distributingpuppetmanifests">Distributing Puppet manifests</h4>
+
+<p>So far we&#8217;ve only applied Puppet manifests to one node, using <code>puppet apply</code> with a local copy of the manifest. </p>
+
+<p>To manage several nodes at once, we need to distribute the Puppet manifests to each node so that they can be applied.</p>
+
+<p>There are several ways to do this, and as we saw in Chapter 1, _Getting started with Puppet_ one approach is to use the <strong>agent/master</strong> architecture, where a central Puppet master server compiles your manifests and distributes the <strong>catalog</strong> (the desired node state) to all nodes.</p>
+
+<p>Another way to use Puppet is to do without the master server altogether, and use Git to distribute manifests to client nodes, which then runs <code>puppet apply</code> to update their configuration. This <strong>stand-alone</strong> Puppet architecture doesn&#8217;t require a dedicated Puppet master server, and there&#8217;s no single point of failure.</p>
+
+<p>Both agent/master and stand-alone architectures are officially supported by Puppet, and it&#8217;s possible to change from one to the other if you decide you need to. The examples in this book were developed with the stand-alone architecture, but will work just as well with agent/master if you prefer it. </p>
+
+<p>There is no difference in the Puppet manifests, language, or structure; the only difference is in the way the manifests are applied.</p>
+
+<p>All you need for a stand-alone Puppet architecture is a Git server which each node can connect to and clone the repo. </p>
+
+<p>You can run your own Git server if you like, or use a public Git hosting service such as GitHub. For ease of explanation, I&#8217;m going to use GitHub for this example setup.</p>
+
+<p>In the following sections, we&#8217;ll create a GitHub account, push our new Puppet repo to GitHub, and then set up our virtual machine to automatically pull any changes from the GitHub repo and apply them with Puppet.</p>
+
+<h4 id="creatingagithubaccountandproject">Creating a GitHub account and project</h4>
+
+<ul>
+<li>Browse to https://github.com/</li>
+<li>Start a new Project</li>
+<li>Call it ‘puppet’ or something like that</li>
+<li>Click <strong>Create repository</strong></li>
+</ul>
+
+<h4 id="pushingyourrepotogithub">Pushing your repo to GitHub</h4>
+
+<p>Git was designed to support a more distributed model with no need for a central repository.Git was designed so that people on an unreliable link could exchange code via email, even. In order to support this model git maintains a local repository with your code and also an additional local repository that mirrors the state of the remote repository. By keeping a copy of the remote repository locally, git can figure out the changes needed even when the remote repository is not reachable. Later when you need to send the changes to someone else, git can transfer them as a set of changes from a point in time known to the remote repository.</p>
+
+<h5 id="gitfetch">Git fetch</h5>
+
+<pre><code class="Shell">$ git fetch origin
+</code></pre>
+
+<p><strong>git fetch</strong> only downloads new data from a remote repository – but it doesn’t integrate any of this new data into working files/directory. Fetch is good for getting a fresh view on all the things that happened in a remote repository. It is harmless and doesnt manipulate local changes.</p>
+
+<h5 id="gitpull">Git Pull</h5>
+
+<pre><code class="Shell">$ git pull origin master
+</code></pre>
+
+<p>git pull does a git fetch followed by a git merge. Since “git pull” tries to merge remote changes with your local ones, a so-called “merge conflict” can occur. It’s highly recommended to start a “git pull” only with a clean working copy.</p>
+
+<h5 id="gitclone">Git clone</h5>
+
+<pre><code class="Shell">$git clone git@github.com:whatever/something.git
+</code></pre>
+
+<p>Git clone will clone a repo int a newly created directory. Git clone additionally creates a remote called ‘origin’ for the repo cloned from, sets up a local branch based on the remote’s active branch (generally master), and creates remote-tracking branches for all the branches in the repo</p>
+
+<pre><code class="Shell">git clone https://github.com/junipernineaj/puppet-reeducation.git
+vi README.md
+git add README.md
+git commit -m &quot;New File&quot;
+</code></pre>
+
+<h4 id="cloningtherepo">Cloning the repo</h4>
+
+<p>In order to manage multiple nodes with Puppet, you will need a copy of the repo on each node. If you have a node you&#8217;d like to manage with Puppet, you can use it in this example. Otherwise, use the Vagrant box we&#8217;ve been working with in previous chapters.</p>
+
+<p>Run the following commands (replace the argument to <code>git clone</code> with the URL of your own GitHub repo, but don&#8217;t lose the <code>production</code> at the end):</p>
+
+<pre><code class="Shell">cd /etc/puppetlabs/code/environments
+sudo mv production production.sample
+sudo git clone https://github.com/junipernineaj/puppet-reeducation.git production
+
+
+Cloning into 'production'...
+remote: Counting objects: 3, done.
+remote: Total 3 (delta 0), reused 3 (delta 0), pack-reused 0
+Unpacking objects: 100% (3/3), done.
+Checking connectivity... done.
+</code></pre>
+
+<p>How does this work? </p>
+
+<p>The standard place for Puppet manifests in a production environment is the <code>/etc/puppetlabs/code/environments/production/</code> directory, so that&#8217;s where our cloned repo needs to end up. </p>
+
+<p>However, the Puppet package installs some sample manifests in that directory, and Git will refuse to clone into a directory that already exists, so we move that directory out of the way with the <code>mv production production.sample</code> command. </p>
+
+<p>The <code>git clone</code> command then recreates that directory, but this time it contains our manifests from the repo.</p>
+
+<h4 id="fetchingandapplyingchangesautomatically">Fetching and applying changes automatically</h4>
+
+<p>In a stand-alone Puppet architecture, each node needs to automatically fetch any changes from the Git repo at regular intervals, and apply them with Puppet. </p>
+
+<p>We can use a simple shell script for this, and there&#8217;s one in the example repo (<code>/examples/files/run-puppet.sh</code>):</p>
+
+<pre><code class="Shell">#!/bin/bash
+cd /etc/puppetlabs/code/environments/production &amp;&amp; git pull
+/opt/puppetlabs/bin/puppet apply manifests/
+</code></pre>
+
+<p>We will need to install this script on the node to be managed by Puppet, and create a cron job to run it regularly (I suggest every 15 minutes). </p>
+
+<p>Of course, we could do this work manually, but isn&#8217;t this book partly about the advantages of automation? Very well, then: let&#8217;s practice what we&#8217;re preaching.</p>
+
+<h5 id="writingamanifesttosetupregularpuppetruns">Writing a manifest to set up regular Puppet runs</h5>
+
+<p>In this section, we&#8217;ll create the necessary Puppet manifests to install the <code>run-puppet</code> script on a node and run it regularly from cron:</p>
+
+<ol>
+<li>Run the following commands to create the required directories in your Puppet repo:</li>
+</ol>
+
+<pre><code class="Shell">su - ubuntu 
+cd /home/ubuntu/puppet
+sudo mkdir manifests files
+</code></pre>
+
+<ol>
+<li>Run the following command to copy the <code>run-puppet</code> script from the <code>examples/</code> directory:</li>
+</ol>
+
+<p><code>Shell
+cp /examples/files/run-puppet.sh files/
+</code>  3. Run the following command to copy the <code>run-puppet</code> manifest from the <code>examples/</code> directory:</p>
+
+<pre><code class="Shell">cp /examples/run-puppet.pp manifests/
+</code></pre>
+
+<ol>
+<li>Add and commit the files to Git with the following commands:</li>
+</ol>
+
+<pre><code class="Shell">git add manifests files
+git commit -m 'Add run-puppet script and cron job'
+git push origin master
+</code></pre>
+
+<p>As in:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:~/puppet-reeducation$ sudo git add manifests files
+
+vagrant@ubuntu-xenial:~/puppet-reeducation$ sudo git commit -m 'Add run-puppet script and cron job'
+[master d782159] Add run-puppet script and cron job
+ 2 files changed, 14 insertions(+)
+ create mode 100755 files/run-puppet.sh
+ create mode 100644 manifests/run-puppet.pp
+
+vagrant@ubuntu-xenial:~/puppet-reeducation$ sudo git push origin master
+Username for 'https://github.com': junipernineaj
+Password for 'https://junipernineaj@github.com':
+Counting objects: 6, done.
+Delta compression using up to 2 threads.
+Compressing objects: 100% (4/4), done.
+Writing objects: 100% (6/6), 692 bytes | 0 bytes/s, done.
+Total 6 (delta 0), reused 0 (delta 0)
+To https://github.com/junipernineaj/puppet-reeducation.git
+   d8716d4..d782159  master -&gt; master
+</code></pre>
+
+<p>Your Git repo now contains everything you need to automatically pull and apply changes on your managed nodes. In the next section, we&#8217;ll see how to set up this process on a node.</p>
+
+<p>You might have noticed that every time you push files to your GitHub repo, Git prompts you for your username and password. </p>
+
+<p>If you want to avoid this, you can associate an SSH key with your GitHub account. </p>
+
+<p>Once you&#8217;ve done this, you&#8217;ll be able to push without having to re-enter your credentials every time. </p>
+
+<p>For more information about using an SSH key with your GitHub account see this article:</p>
+
+<p>https://help.github.com/articles/adding-a-new-ssh-key-to-your-github-account/</p>
+
+<h5 id="applyingtherun-puppetmanifest">Applying the run-puppet manifest</h5>
+
+<p>Having created and pushed the manifest necessary to set up automatic Puppet runs, we now need to pull and apply it on the target node.</p>
+
+<p>In the cloned copy of your repo in <code>/etc/puppetlabs/code/environments/production</code>, run the following commands:</p>
+
+<pre><code class="Shell">sudo git pull
+sudo puppet apply manifests/
+Notice: Compiled catalog for localhost in environment production in 0.08 seconds
+Notice: /Stage[main]/Main/File[/usr/local/bin/run-puppet]/ensure: defined content as '{md5}83a6903e69564bcecc8fd1a83b1a7beb'
+Notice: /Stage[main]/Main/Cron[run-puppet]/ensure: created
+Notice: Applied catalog in 0.07 seconds
+</code></pre>
+
+<p>My output:</p>
+
+<pre><code class="Shell">ubuntu@ubuntu-xenial:/etc/puppetlabs/code/environments/production$ sudo puppet apply manifests/
+Notice: Compiled catalog for ubuntu-xenial.lan in environment production in 0.04 seconds
+Notice: /Stage[main]/Main/File[/usr/local/bin/run-puppet]/ensure: defined content as '{md5}dbfba978957e90ebb47e3a266b89231b'
+Notice: /Stage[main]/Main/Cron[run-puppet]/ensure: created
+Notice: Applied catalog in 0.06 seconds
+</code></pre>
+
+<p>You can see from Puppet&#8217;s output that it has created the <code>/usr/local/bin/run-puppet</code> script and the <code>run-puppet</code> cron job. </p>
+
+<p>This will now run automatically every 15 minutes, pull any new changes from the Git repo, and apply the updated manifest.</p>
+
+<p><strong>NB.</strong> They will be put in the <code>root</code> crontab.</p>
+
+<p>If you run this from <code>/home/ubuntu</code> you get:</p>
+
+<pre><code class="Shell">ubuntu@ubuntu-xenial:~/puppet$ sudo puppet apply manifests/
+Notice: Compiled catalog for ubuntu-xenial.lan in environment production in 0.04 seconds
+Notice: Applied catalog in 0.04 seconds
+</code></pre>
+
+<p>The same.</p>
+
+<p>Here is the crontab:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/home/ubuntu$ sudo crontab -l
+# HEADER: This file was autogenerated at 2018-10-17 10:39:06 +0000 by puppet.
+# HEADER: While it can still be managed manually, it is definitely not recommended.
+# HEADER: Note particularly that the comments starting with 'Puppet Name' should
+# HEADER: not be deleted, as doing so could cause duplicate cron jobs.
+# Puppet Name: run-puppet
+*/15 * * * * /usr/local/bin/run-puppet
+</code></pre>
+
+<p>Here is the script in <code>/usr/local/bin</code></p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/home/ubuntu$ cd /usr/local/bin
+vagrant@ubuntu-xenial:/usr/local/bin$ ls
+run-puppet
+vagrant@ubuntu-xenial:/usr/local/bin$ ls -l
+total 4
+-rwxr-xr-x 1 root root 116 Oct 17 10:39 run-puppet
+</code></pre>
+
+<h5 id="therun-puppetscript">The run-puppet script</h5>
+
+<p>The <code>run-puppet</code> script does the following two things in order to automatically update the target node:</p>
+
+<ul>
+<li>Pull any changes from the Git server (<code>git pull</code>)</li>
+<li>Apply the manifest (<code>puppet apply</code>)</li>
+</ul>
+
+<p>Our Puppet manifest in <code>run-puppet.pp</code> deploys this script to the target node, using a <code>file</code> resource, and then sets up a cron job to run it every 15 minutes, using a <code>cron</code> resource. </p>
+
+<p>We haven&#8217;t met the <code>cron</code> resource before, but we will cover it in more detail in <em>Understanding Puppet resources</em>`.</p>
+
+<p>For now, just note that the cron resource has a name (<code>run-puppet</code>), which is just for the benefit of us humans, to remind us what it does, and it also has a <code>command</code> to run and <code>hour</code> and <code>minute</code> attributes to control when it runs. </p>
+
+<p>The value <code>*/15</code> tells <code>cron</code> to run the job every 15 minutes.</p>
+
+<h5 id="testingautomaticpuppetruns">Testing automatic Puppet runs</h5>
+
+<p>To prove that the automatic Puppet run works, make a change to your manifest which creates a file (<code>/tmp/hello.txt</code>, for example). </p>
+
+<p>Commit and push this change to Git. Wait 15 minutes, and check your target node. </p>
+
+<pre><code class="Shell">git status
+git commit -a -m “blah”
+</code></pre>
+
+<p>Then distribute it.</p>
+
+<pre><code class="Shell">git push ##to get it to your remote
+</code></pre>
+
+<p>The file should be present. If not, something is broken. </p>
+
+<p>To troubleshoot the problem, try running <code>sudo run-puppet</code> manually. </p>
+
+<p>If this works, check that the cron job is correctly installed by running <code>sudo crontab -l</code>. </p>
+
+<p>It should look something like the following:</p>
+
+<pre><code class="Shell"># HEADER: This file was autogenerated at 2017-04-05 01:46:03 -0700 by puppet.
+# HEADER: While it can still be managed manually, it is definitely not recommended.
+# HEADER: Note particularly that the comments starting with 'Puppet Name' should
+# HEADER: not be deleted, as doing so could cause duplicate cron jobs.
+# Puppet Name: run-puppet
+*/15 * * * * /usr/local/bin/run-puppet
+</code></pre>
+
+<h5 id="managingmultiplefiles">Managing multiple files</h5>
+
+<p>We now have a fully automated stand-alone Puppet infrastructure. </p>
+
+<p>Any change that we check in to our Git repo will be automatically applied to all nodes under Puppet management. To add more nodes to your infrastructure, follow these steps for each new node:</p>
+
+<ul>
+<li>Install Puppet (not necessary if you&#8217;re using the Vagrant box).</li>
+<li>Clone your Git repo (as described in the Cloning the repo section).</li>
+<li>Apply the manifest (as described in the Applying the run-puppet manifest section).</li>
+</ul>
+
+<p>You might be wondering how to tell Puppet how to apply different manifests to different nodes. </p>
+
+<p>For example, you might be managing two nodes, one of which is a web server and the other a database server. Naturally, they will need different resources.</p>
+
+<p>We&#8217;ll learn more about nodes and how to control the application of resources to different nodes in Classes, roles, and profiles. </p>
+
+<p>But first, we need to learn about Puppet&#8217;s resources and how to use them. </p>
+
+<p>We&#8217;ll do that in the next chapter.</p>
+
+<h5 id="summary">Summary</h5>
+
+<p>In this chapter, we introduced the concepts of version control, and the essentials of Git in particular. </p>
+
+<p>We set up a new Git repo, created a GitHub account, pushed our code to it, and cloned it on a node. </p>
+
+<p>We wrote a shell script to automatically pull and apply changes from the GitHub repo on any node, and a Puppet manifest to install this script and run it regularly from <code>cron</code>.</p>
+
+<p>In the next chapter, we&#8217;ll explore the power of Puppet resources, going into more detail about the Puppet <code>file</code>, <code>package</code>, and <code>service</code> resources we&#8217;ve already encountered, and introducing three more important resource types: <code>user</code>, <code>cron</code>, and <code>exec</code>.</p>
+
+</body>
+</html>
