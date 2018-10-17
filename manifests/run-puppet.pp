@@ -4,6 +4,11 @@ file { '/usr/local/bin/run-puppet':
   mode   => '0755',
 }
 
+file { '/home/ubuntu/hello.txt':
+  ensure => file,
+  content => "hello, world\n",
+}
+
 cron { 'run-puppet':
   command => '/usr/local/bin/run-puppet',
   hour    => '*',
