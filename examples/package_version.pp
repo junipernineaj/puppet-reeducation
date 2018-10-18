@@ -1,0 +1,3 @@
+package { 'openssl':
+  ensure => latest,
+}
