@@ -2,7 +2,7 @@
 <html>
 <head>
 	<meta charset="utf-8"/>
-	<title>Three-Weeks-And-Counting</title>
+	<title>Puppet-And-Git</title>
 	<meta name="author" content="Anthony Dawson"/>
 </head>
 <body>
@@ -11,7 +11,7 @@
 
 <h2 id="puppettraining">Puppet Training</h2>
 
-<h3 id="chapter1-downloadsvirtualbox">Chapter 1 - Downloads VirtualBox</h3>
+<h3 id="chapter1-downloadingthetoolsyouneed">Chapter 1 - Downloading the Tools you need</h3>
 
 <h4 id="installinggitanddownloadingtherepo">Installing Git and downloading the repo</h4>
 
@@ -1265,6 +1265,16 @@ cd /etc/puppetlabs/code/environments/production &amp;&amp; git pull
 
 <p>Of course, we could do this work manually, but isn&#8217;t this book partly about the advantages of automation? Very well, then: let&#8217;s practice what we&#8217;re preaching.</p>
 
+<p>Example:</p>
+
+<pre><code class="Shell">  219  sudo vi ssh_authorized_key.pp
+  220  ls -ltr
+  221  sudo git add ssh_authorized_key.pp
+  222  sudo git commit -m &quot;Update email in ssh authorised key file&quot;
+  223  git status
+  224  sudo git push
+</code></pre>
+
 <h5 id="writingamanifesttosetupregularpuppetruns">Writing a manifest to set up regular Puppet runs</h5>
 
 <p>In this section, we&#8217;ll create the necessary Puppet manifests to install the <code>run-puppet</code> script on a node and run it regularly from cron:</p>
@@ -1470,6 +1480,1021 @@ git commit -a -m “blah”
 <p>We wrote a shell script to automatically pull and apply changes from the GitHub repo on any node, and a Puppet manifest to install this script and run it regularly from <code>cron</code>.</p>
 
 <p>In the next chapter, we&#8217;ll explore the power of Puppet resources, going into more detail about the Puppet <code>file</code>, <code>package</code>, and <code>service</code> resources we&#8217;ve already encountered, and introducing three more important resource types: <code>user</code>, <code>cron</code>, and <code>exec</code>.</p>
+
+<h3 id="chapter4-understandingpuppetresources">Chapter 4 - Understanding Puppet Resources</h3>
+
+<p>We&#8217;ve already met three important types of Puppet resources: <code>package</code>, <code>file</code>, and <code>service</code>. </p>
+
+<p>In this chapter, we&#8217;ll learn more about these, plus other important resource types for managing users, groups, SSH keys, cron jobs, and arbitrary commands.</p>
+
+<h4 id="files">Files</h4>
+
+<p>We saw in _Chapter 2, Creating your first manifests_ that Puppet can manage files on a node using the <code>file</code> resource, and we looked at an example which sets the contents of a file to a particular string using the <code>content</code> attribute. Here it is again <code>(file_hello.pp)</code>:</p>
+
+<pre><code class="Shell">file { '/tmp/hello.txt':
+  content =&gt; &quot;hello, world\n&quot;,
+}
+</code></pre>
+
+<h5 id="thepathattribute">The path attribute</h5>
+
+<p>We&#8217;ve seen that every Puppet resource has a title (a quoted string followed by a colon). In the <code>file_hello</code> example, the title of the <code>file</code> resource is ‘<code>/tmp/hello.txt</code>’. </p>
+
+<p>It&#8217;s easy to guess that Puppet is going to use this value as the path of the created file. In fact, <code>path</code> is one of the attributes you can specify for a <code>file</code>, but if you don&#8217;t specify it, Puppet will use the title of the resource as the value of <code>path</code>.</p>
+
+<h5 id="managingwholefiles">Managing whole files</h5>
+
+<p>While it&#8217;s useful to be able to set the contents of a file to a short text string, most files we&#8217;re likely to want to manage will be too large to include directly in our Puppet manifests. </p>
+
+<p>Ideally, we would put a copy of the file in the Puppet repo, and have Puppet simply copy it to the desired place in the filesystem. </p>
+
+<p>The <code>source</code> attribute does exactly that (<code>file_source.pp</code>):</p>
+
+<pre><code class="Shell">file { '/etc/motd':
+  source =&gt; '/examples/files/motd.txt',
+}
+</code></pre>
+
+<p>To try this example with your Vagrant box, run the following commands:</p>
+
+<pre><code class="Shell">sudo puppet apply /examples/file_source.pp
+cat /etc/motd
+The best software in the world only sucks. The worst software is significantly worse than that.
+-Luke Kanies
+</code></pre>
+
+<p>Which does this:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/examples/files$ sudo puppet apply /examples/file_source.pp
+Notice: Compiled catalog for ubuntu-xenial.lan in environment production in 0.02 seconds
+Notice: /Stage[main]/Main/File[/etc/motd]/ensure: defined content as '{md5}2400ab50861ff84ea5a3e43126d162d5'
+Notice: Applied catalog in 0.12 seconds
+</code></pre>
+
+<p>(From now on, I won&#8217;t give you explicit instructions on how to run the examples; just apply them in the same way using <code>sudo puppet apply</code> as shown here. </p>
+
+<p>All the examples in this book are in the <code>examples/</code> directory of the GitHub repo, and I&#8217;ll give you the name of the appropriate file for each example, such as <code>file_source.pp</code>.)</p>
+
+<p>BUT:</p>
+
+<p>Why do we have to run <code>sudo puppet apply</code> instead of just <code>puppet apply</code>? </p>
+
+<p>Puppet has the permissions of the user who runs it, so if Puppet needs to modify a file owned by <code>root</code>, it must be run with <code>root</code>’s permissions (which is what <code>sudo</code> does). </p>
+
+<p>You will usually run Puppet as <code>root</code> because it needs those permissions to do things like installing packages, modifying config files owned by <code>root</code>, and so on.</p>
+
+<p>The value of the <code>source</code> attribute can be a path to a file on the node, as here, or an HTTP URL, as in the following example (<code>file_http.pp</code>):</p>
+
+<pre><code class="Shell">file { '/tmp/README.md':
+  source =&gt; 'https://raw.githubusercontent.com/puppetlabs/puppet/master/README.md',
+}
+</code></pre>
+
+<p>Although this is a handy feature, bear in mind that every time you add an external dependency like this to your Puppet manifest, you&#8217;re adding a potential point of failure.</p>
+
+<p>Wherever you can, use a local copy of a file instead of having Puppet fetch it remotely every time. This particularly applies to software which needs to be built from a tarball downloaded from a website. </p>
+
+<p>If possible, download the tarball and serve it from a local webserver or file server. If this isn&#8217;t practical, using a caching proxy server can help save time and bandwidth when you&#8217;re building a large number of nodes.</p>
+
+<h5 id="ownership">Ownership</h5>
+
+<p>On Unix-like systems, files are associated with an <strong>owner</strong>, a <strong>group</strong>, and a set of <strong>permissions</strong> to read, write, or execute the file. Since we normally run Puppet with the permissions of the <code>root</code> user (via <code>sudo</code>), the files Puppet manages will be owned by that user:</p>
+
+<pre><code class="Shell">ls -l /etc/motd
+-rw-r--r-- 1 root root 109 Aug 31 04:03 /etc/motd
+</code></pre>
+
+<p>Often, this is just fine, but if we need the file to belong to another user (for example, if that user needs to be able to write to the file), we can express this by setting the <code>owner</code> attribute (file_owner.pp):</p>
+
+<pre><code class="Shell">file { '/etc/owned_by_ubuntu':
+  ensure =&gt; present,
+  owner  =&gt; 'ubuntu',
+}
+
+vagrant@ubuntu-xenial:~$ sudo puppet apply /examples/file_owner.pp
+Notice: Compiled catalog for ubuntu-xenial.lan in environment production in 0.04 seconds
+Notice: /Stage[main]/Main/File[/etc/owned_by_ubuntu]/ensure: created
+Notice: Applied catalog in 0.03 seconds
+vagrant@ubuntu-xenial:~$
+
+ls -l /etc/owned_by_ubuntu
+-rw-r--r-- 1 ubuntu root 0 Aug 31 04:48 /etc/owned_by_ubuntu
+
+</code></pre>
+
+<p>You can see that Puppet has created the file and its owner has been set to <code>ubuntu</code>. You can also set the group ownership of the file using the <code>group</code> attribute (<code>file_group.pp</code>):</p>
+
+<pre><code class="Shell">file { '/etc/owned_by_ubuntu':
+  ensure =&gt; present,
+  owner  =&gt; 'ubuntu',
+  group  =&gt; 'ubuntu',
+}
+
+ls -l /etc/owned_by_ubuntu
+-rw-r--r-- 1 ubuntu ubuntu 0 Aug 31 04:48 /etc/owned_by_ubuntu
+</code></pre>
+
+<p>Note that this time we didn&#8217;t specify either a <code>content</code> or <code>source</code> attribute for the file, but simply <code>ensure =&gt; present</code>. </p>
+
+<p>In this case, Puppet will create a file of zero size.</p>
+
+<h5 id="permissions">Permissions</h5>
+
+<p>Files on Unix-like systems have an associated <strong>mode</strong> which determines access permissions for the file. It governs read, write, and execute permissions for the file&#8217;s owner, any user in the file&#8217;s group, and other users. </p>
+
+<p>Puppet supports setting permissions on files using the <code>mode</code> attribute. This takes an octal value (base 8, indicated by a leading 0 digit), with each digit representing a field of 3 binary bits: the permissions for owner, group, and other, respectively.
+In the following example, we use the <code>mode</code> attribute to set a mode of <code>0644</code> (&#8220;read and write for the owner, read-only for the group, and read-only for other users&#8221;) on a file (<code>file_mode.pp</code>):</p>
+
+<pre><code class="Shell">file { '/etc/owned_by_ubuntu':
+  ensure =&gt; present,
+  owner  =&gt; 'ubuntu',
+  mode   =&gt; '0644',
+}
+
+</code></pre>
+
+<p>Resulting in:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/examples$ ls -l /etc/owned_by_ubuntu
+-rw-r--r-- 1 ubuntu ubuntu 0 Oct 17 16:19 /etc/owned_by_ubuntu
+</code></pre>
+
+<p>This will be quite familiar to experienced system administrators, as the octal values for file permissions are exactly the same as those understood by the Unix <code>chmod</code> command. </p>
+
+<p>For more information, run the command <code>man chmod</code>.</p>
+
+<h5 id="directories">Directories</h5>
+
+<p>Creating or managing permissions on a <strong>directory</strong> is a common task, and Puppet uses the <code>file</code> resource to do this too. </p>
+
+<p>If the value of the <code>ensure</code> attribute is <code>directory</code>, the file will be a directory (<code>file_directory.pp</code>):</p>
+
+<pre><code class="Shell">file { '/etc/config_dir':
+  ensure =&gt; directory,
+}
+</code></pre>
+
+<p>As with regular files, you can use the <code>owner</code>, <code>group</code>, and <code>mode</code> attributes to control access to directories.</p>
+
+<h5 id="treesoffiles">Trees of Files</h5>
+
+<p>We&#8217;ve already seen that Puppet can copy a single file to the node, but what about a whole directory of files, possibly including subdirectories (known as a <strong>file tree</strong>)?</p>
+
+<p>The recurse attribute will take care of this (<code>file_tree.pp</code>):</p>
+
+<pre><code class="Shell">file { '/etc/config_dir':
+  source  =&gt; '/examples/files/config_dir',
+  recurse =&gt; true,
+}
+
+ls /etc/config_dir/
+1  2  3
+</code></pre>
+
+<p>When <code>recurse</code> is <code>true</code>, Puppet will copy all the files and directories (and their subdirectories) in the source directory (<code>/examples/files/config_dir/</code> in this example) to the target directory (<code>/etc/config_dir/</code>).
+If the target directory already exists and has files in it, Puppet will not interfere with them, but you can change this behaviour using the <code>purge</code> attribute. </p>
+
+<p>If this is <code>true</code>, Puppet will delete any files and directories in the target directory which are not present in the source directory. Use this attribute with care.</p>
+
+<h5 id="symboliclinks">Symbolic Links</h5>
+
+<p>Another common requirement for managing files is to create or modify a <strong>symbolic link</strong> (known as a <strong>symlink</strong>, for short). You can have Puppet do this by setting <code>ensure =&gt; link</code> on the <code>file</code> resource and specifying the <code>target</code> attribute (<code>file_symlink.pp</code>):</p>
+
+<pre><code class="Shell">file { '/etc/this_is_a_link':
+  ensure =&gt; link,
+  target =&gt; '/etc/motd',
+}
+
+ls -l /etc/this_is_a_link
+lrwxrwxrwx 1 root root 9 Aug 31 05:05 /etc/this_is_a_link -&gt; /etc/motd
+</code></pre>
+
+<h4 id="packages">Packages</h4>
+
+<p>We&#8217;ve already seen how to install a package using the <code>package</code> resource, and this is all you need to do with most packages. </p>
+
+<p>As a recap, all resource declarations in Puppet follow this form:</p>
+
+<pre><code class="Shell">RESOURCE_TYPE { TITLE:
+  ATTRIBUTE =&gt; VALUE,
+  ...
+}
+</code></pre>
+
+<p><code>package</code> resources are no different. The <code>RESOURCE_TYPE</code> is <code>package</code>, and the only attribute you usually need to specify is <code>ensure</code>, and the only value it usually needs to take is <code>installed</code>:</p>
+
+<pre><code class="Shell">package { 'cowsay':
+  ensure =&gt; installed,
+}
+</code></pre>
+
+<p>However, the <code>package</code> resource has a few extra features which may be useful.</p>
+
+<h5 id="uninstallingpackages">Uninstalling packages</h5>
+
+<p>The <code>ensure</code> attribute normally takes the value <code>installed</code> in order to install a package, but if you specify <code>absent</code> instead, Puppet will <strong>remove</strong> the package if it happens to be installed. Otherwise, it will take no action. </p>
+
+<p>The following example will remove the <code>apparmor</code> package if it&#8217;s installed (<code>package_remove.pp</code>):</p>
+
+<pre><code class="Shell">package { 'apparmor':
+  ensure =&gt; absent,
+}
+</code></pre>
+
+<p>By default, when Puppet removes packages, it leaves in place any files managed by the package. To purge all the files associated with the package, use <code>purged</code> instead of <code>absent</code>.</p>
+
+<h5 id="installingspecificversions">Installing Specific Versions</h5>
+
+<p>If there are multiple versions of a package available to the system&#8217;s package manager, specifying <code>ensure =&gt; installed</code> will cause Puppet to install the default version (usually the latest). </p>
+
+<p>But, if you need a specific version, you can specify that version string as the value of <code>ensure</code>, and Puppet will install that version (<code>package_version.pp</code>):</p>
+
+<pre><code class="Shell">package { 'openssl':
+  ensure =&gt; '1.0.2g-1ubuntu4.8',
+}
+</code></pre>
+
+<p>It&#8217;s a good idea to specify an exact version whenever you manage packages with Puppet, so that all the nodes will get the same version of a given package. </p>
+
+<p>Otherwise, if you use <code>ensure =&gt; installed</code>, they will just get whatever version was current at the time they were built, leading to a situation where different nodes have different package versions.</p>
+
+<p>When a newer version of the package is released, and you decide it&#8217;s time to upgrade to it, you can update the version string specified in the Puppet manifest and Puppet will upgrade the package everywhere.</p>
+
+<h5 id="installingthelatestversion">Installing the Latest Version</h5>
+
+<p>On the other hand, if you specify <code>ensure =&gt; latest</code> for a package, Puppet will make sure that the latest available version is installed <em>every time the manifest is applied</em>. </p>
+
+<p>When a new version of the package becomes available, it will be installed automatically on the next Puppet run.</p>
+
+<p>This is not generally what you want when using a package repository that&#8217;s not under your control (for example, the main Ubuntu repository). It means that packages will be upgraded at unexpected times, which may break your application (or at least result in unplanned downtime). </p>
+
+<p>A better strategy is to tell Puppet to install a specific version which you know works, and test upgrades in a controlled environment before rolling them out to production.</p>
+
+<p>If you maintain your own package repository and control the release of new packages to it, <code>ensure =&gt; latest</code> can be a useful feature: Puppet will update a package as soon as you push a new version to the repo. If you are relying on upstream repositories, such as the Ubuntu repositories, it&#8217;s better to manage the version number directly by specifying an explicit version as the value of <code>ensure</code>.</p>
+
+<p>http://manpages.ubuntu.com/manpages/bionic/man1/version.1ssl.html</p>
+
+<h5 id="installingrubygems">Installing Ruby Gems</h5>
+
+<p>Although the <code>package</code> resource is most often used to install packages using the normal system package manager (in the case of Ubuntu, that&#8217;s APT), it can install other kinds of packages as well. </p>
+
+<p>Library packages for the Ruby programming language are known as <strong>gems</strong>. Puppet can install Ruby gems for you using the <code>provider =&gt; gem</code> attribute (<code>package_gem.pp</code>):</p>
+
+<pre><code class="Shell">package { 'ruby':
+  ensure =&gt; installed,
+}
+
+package { 'puppet-lint':
+  ensure   =&gt; installed,
+  provider =&gt; gem,
+}
+</code></pre>
+
+<p>Resulting in:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:~$ sudo puppet apply /examples/package_gem.pp
+Notice: Compiled catalog for ubuntu-xenial.lan in environment production in 0.45 seconds
+Notice: /Stage[main]/Main/Package[ruby]/ensure: created
+Notice: /Stage[main]/Main/Package[puppet-lint]/ensure: created
+Notice: Applied catalog in 6.31 seconds
+</code></pre>
+
+<p><code>puppet-lint</code> is a Ruby gem and therefore we have to specify <code>provider =&gt; gem</code> for this package so that Puppet doesn&#8217;t think it&#8217;s a standard system package and try to install it via APT. </p>
+
+<p>Since the <code>gem</code> provider is not available unless Ruby is installed, we install the <code>ruby</code> package first, then the <code>puppet-lint</code> gem.</p>
+
+<p>http://puppet-lint.com/checks/</p>
+
+<p>The <code>puppet-lint</code> tool, by the way, is a good thing to have installed. It will check your Puppet manifests for common style errors and make sure they comply with the official Puppet style guide. </p>
+
+<p>Try it now:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:~$ puppet-lint /examples/lint_test.pp
+
+WARNING: indentation of =&gt; is not properly aligned (expected in column 11, but found it in column 10) on line 2
+</code></pre>
+
+<p>As in:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:~$ more /examples/lint_test.pp
+file { '/tmp/lint.txt':
+  ensure =&gt; file,
+  content =&gt; &quot;puppet-lint is your friend\n&quot;,
+}
+</code></pre>
+
+<p>In this example, <code>puppet-lint</code> is warning you that the <code>=&gt;</code> arrows are not lined up vertically, which the style guide says they should be:
+When <code>puppet-lint</code> produces no output, the file is free of lint errors.</p>
+
+<p>You can fix this with the <code>--fix</code> flag:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:~$ puppet-lint --fix /examples/lint_test.pp
+FIXED: indentation of =&gt; is not properly aligned (expected in column 11, but found it in column 10) on line 2
+</code></pre>
+
+<p>As in:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:~$ more /examples/lint_test.pp
+file { '/tmp/lint.txt':
+  ensure  =&gt; file,
+  content =&gt; &quot;puppet-lint is your friend\n&quot;,
+}
+</code></pre>
+
+<h5 id="installinggemsinpuppetscontext">Installing Gems in Puppet&#8217;s Context</h5>
+
+<p>Puppet itself is written at least partly in Ruby, and makes use of several Ruby gems. </p>
+
+<p>To avoid any conflicts with the version of Ruby and gems which the node might need for other applications, Puppet packages its own version of Ruby and associated gems under the <code>/opt/puppetlabs/</code> directory. This means you can install (or remove) whichever system version of Ruby you like and Puppet will not be affected.</p>
+
+<p>However, if you need to install a gem to extend Puppet&#8217;s capabilities in some way, then doing it with a <code>package</code> resource and <code>provider =&gt; gem</code> won&#8217;t work. That is, the gem will be installed, but only in the system Ruby context, and it won&#8217;t be visible to Puppet.</p>
+
+<p>Fortunately, the <code>puppet_gem</code> provider is available for exactly this purpose. When you use this provider, the gem will be installed in Puppet&#8217;s context (and, naturally, won&#8217;t be visible in the system context). The following example demonstrates how to use this provider (<code>package_puppet_gem.pp</code>):</p>
+
+<pre><code class="Shell">package { 'r10k':
+  ensure   =&gt; installed,
+  provider =&gt; puppet_gem,
+}
+</code></pre>
+
+<p>Which did:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:~$ sudo puppet apply /examples/package_puppet_gem.pp
+Notice: Compiled catalog for ubuntu-xenial.lan in environment production in 0.42 seconds
+Notice: Applied catalog in 0.17 seconds
+</code></pre>
+
+<p>To see the gems installed in Puppet&#8217;s context, use Puppet&#8217;s own version of the <code>gem</code> command with the following path:</p>
+
+<pre><code class="Shell">/opt/puppetlabs/puppet/bin/gem list
+</code></pre>
+
+<p>Which produces:</p>
+
+<pre><code class="Shell">** LOCAL GEMS ***
+
+bigdecimal (default: 1.3.4)
+cmath (default: 1.0.0)
+colored (1.2)
+cri (2.15.1)
+csv (default: 1.0.0)
+date (default: 1.0.0)
+deep_merge (1.0.1)
+did_you_mean (1.2.0)
+…
+..
+</code></pre>
+
+<h5 id="usingensurepackages">Using Ensure packages</h5>
+
+<p>To avoid potential package conflicts between different parts of your Puppet code or between your code and third-party modules, the Puppet standard library provides a useful wrapper for the <code>package</code> resource, called <code>ensure_packages()</code>. </p>
+
+<p>We&#8217;ll cover this in detail in Chapter 7, <em>Mastering modules</em>.</p>
+
+<h4 id="services">Services</h4>
+
+<p>Although services are implemented in a number of varied and complicated ways at the operating system level, Puppet does a good job of abstracting away most of this with the <code>service</code> resource and exposing just the two attributes of services which you most commonly need to manage: whether they&#8217;re running (<code>ensure</code>) and whether they start at boot time (<code>enable</code>). </p>
+
+<p>We covered the use of these in Chapter 2, <em>Creating your first manifests</em>, and most of the time, you won&#8217;t need to know any more about <code>service</code> resources.</p>
+
+<p>However, you&#8217;ll occasionally encounter services which don&#8217;t play well with Puppet, for a variety of reasons. </p>
+
+<p>Sometimes, Puppet is unable to detect that the service is already running and keeps trying to start it. Other times, Puppet may not be able to properly restart the service when a dependent resource changes. </p>
+
+<p>There are a few useful attributes for <code>service</code> resources which can help resolve these problems.</p>
+
+<h5 id="thehasstatusattribute">The hasstatus attribute</h5>
+
+<p>When a <code>service</code> resource has the attribute <code>ensure =&gt; running</code> attribute, Puppet needs to be able to check whether the service is, in fact, running. The way it does this depends on the underlying operating system. </p>
+
+<p>On Ubuntu 16 and later, for example, it runs <code>systemctl is-active SERVICE</code>. </p>
+
+<p>If the service is packaged to work with <code>systemd</code>, that should be just fine, but in many cases, particularly with older software, it may not respond properly.</p>
+
+<p>If you find that Puppet keeps attempting to start the service on every Puppet run, even though the service is running, it may be that Puppet&#8217;s default service status detection isn&#8217;t working. In this case, you can specify the <code>hasstatus =&gt; false</code> attribute for the service (<code>service_hasstatus.pp</code>):</p>
+
+<pre><code class="Shell">service { 'ntp':
+  ensure    =&gt; running,
+  enable    =&gt; true,
+  hasstatus =&gt; false,
+}
+</code></pre>
+
+<p>Which does:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:~$ sudo puppet apply /examples/service_hasstatus.pp
+Notice: Compiled catalog for ubuntu-xenial.lan in environment production in 0.65 seconds
+Notice: /Stage[main]/Main/Package[ntp]/ensure: created
+Notice: Applied catalog in 4.73 seconds
+</code></pre>
+
+<p>When <code>hasstatus</code> is false, Puppet knows not to try to check the service status using the default system service management command, and instead, will look in the process table for a running process which matches the name of the service. </p>
+
+<p>If it finds one, it will infer that the service is running and take no further action.</p>
+
+<h5 id="thepatternattribute">The pattern attribute</h5>
+
+<p>Sometimes, when using <code>hasstatus =&gt; false</code>, the service name as defined in Puppet doesn&#8217;t actually appear in the process table, because the command that provides the service has a different name. </p>
+
+<p>If this is the case, you can tell Puppet exactly what to look for using the <code>pattern</code> attribute.</p>
+
+<p>If <code>hasstatus</code> is <code>false</code> and <code>pattern</code> is specified, Puppet will search for the value of <code>pattern</code> in the process table to determine whether or not the service is running. </p>
+
+<p>To find the pattern you need, you can use the <code>ps</code> command to see the list of running processes:</p>
+
+<pre><code class="Shell">ps ax
+</code></pre>
+
+<p>Find the process you&#8217;re interested in and pick a string which will match only the name of that process. For example, if it&#8217;s <code>ntpd</code>, you might specify the <code>pattern</code> attribute as <code>ntpd</code> (<code>service_pattern.pp</code>):</p>
+
+<pre><code class="Shell">service { 'ntp':
+  ensure    =&gt; running,
+  enable    =&gt; true,
+  hasstatus =&gt; false,
+  pattern   =&gt; 'ntpd',
+}
+</code></pre>
+
+<p>As in:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:~$ ps -ax | grep ntpd
+ 5795 ?        Ss     0:00 /usr/sbin/ntpd -p /var/run/ntpd.pid -g -u 112:116
+ 7448 pts/0    S+     0:00 grep --color=auto ntpd
+</code></pre>
+
+<h5 id="thehasrestartandrestartattributes">The hasrestart and restart attributes</h5>
+
+<p>When a service is notified (for example, if a <code>file</code> resource uses the <code>notify</code> attribute to tell the service its config file has changed, a common pattern which we looked at in Chapter 2, _Creating your first manifests)_, Puppet&#8217;s default behaviour is to stop the service, then start it again. </p>
+
+<p>This usually works, but many services implement a <code>restart</code> command in their management scripts. </p>
+
+<p>If this is available, it&#8217;s usually a good idea to use it: it may be faster or safer than stopping and starting the service. </p>
+
+<p>Some services take a while to shut down properly when stopped, for example, and Puppet may not wait long enough before trying to restart them, so that you end up with the service not running at all.</p>
+
+<p>If you specify <code>hasrestart =&gt; true</code> for a service, then Puppet will try to send a <code>restart</code> command to it, using whatever service management command is appropriate for the current platform (<code>systemctl</code>, for example, on Ubuntu). </p>
+
+<p>The following example shows the use of <code>hasrestart</code> (<code>service_hasrestart.pp</code>):</p>
+
+<pre><code class="Shell">service { 'ntp':
+  ensure     =&gt; running,
+  enable     =&gt; true,
+  hasrestart =&gt; true,
+}
+</code></pre>
+
+<p>To further complicate things, the default system service <code>restart</code> command may not work, or you may need to take certain special actions when the service is restarted (disabling monitoring notifications, for example). </p>
+
+<p>You can specify any <code>restart</code> command you like for the service using the <code>restart</code> attribute (<code>service_custom_restart.pp</code>):</p>
+
+<pre><code class="Shell">service { 'ntp':
+  ensure  =&gt; running,
+  enable  =&gt; true,
+  restart =&gt; '/bin/echo Restarting &gt;&gt;/tmp/debug.log &amp;&amp; systemctl restart ntp',
+}
+</code></pre>
+
+<p>In this example, the <code>restart</code> command writes a message to a log file before restarting the service in the usual way, but it could, of course, do anything you need it to. </p>
+
+<p>Note that the <code>restart</code> command is only used when Puppet restarts the service (generally because it was notified by a change to some config file). </p>
+
+<p>It&#8217;s not used when starting the service from a stopped state. </p>
+
+<p>If Puppet finds the service has stopped and needs to start it, it will use the normal system service start command.</p>
+
+<p>In the extremely rare event that the service cannot be stopped or started using the default service management command, Puppet also provides the <code>stop</code> and <code>start</code> attributes so that you can specify custom commands to stop and start the service, just the same way as with the <code>restart</code> attribute. </p>
+
+<p>If you need to use either of these, though, it&#8217;s probably safe to say that you&#8217;re having a bad day.</p>
+
+<h4 id="users">Users</h4>
+
+<p>A user on Unix-like systems does not necessarily correspond to a human person who logs in and types commands, although it sometimes does. A user is simply a named entity that can own files and run commands with certain permissions and that may or may not have permission to read or modify other users&#8217; files. It&#8217;s very common, for sound security reasons, to run each service on a system with its own user account. This simply means that the service runs with the identity and permissions of that user.</p>
+
+<p>For example, a web server will often run as the <code>www-data</code> user, which exists solely to own files the web server needs to read and write. This limits the danger of a security breach via the web server, because the attacker would only have the <code>www-data</code> user&#8217;s permissions, which are very limited, rather than the <code>root</code> user&#8217;s, which can modify any aspect of the system. It is generally a bad idea to run services exposed to the public Internet as the <code>root</code> user. The service user should have only the minimum permissions it needs to operate the service.</p>
+
+<p>Given this, an important part of system configuration involves creating and managing users, and Puppet&#8217;s <code>user</code> resource provides a model for doing just that. Just as we saw with packages and services, the details of implementation and the commands used to manage users vary widely from one operating system to another, but Puppet provides an abstraction which hides those details behind a common set of attributes for users.</p>
+
+<h5 id="creatingusers">Creating Users</h5>
+
+<p>The following example shows a typical <code>user</code> and <code>group</code> declaration in Puppet (<code>user.pp</code>):</p>
+
+<pre><code class="Shell">group { 'devs':
+  ensure =&gt; present,
+  gid    =&gt; 3000,
+}
+
+user { ‘juniper nine’:
+  ensure =&gt; present,
+  uid    =&gt; '3001',
+  home   =&gt; '/home/junipernine’,
+  shell  =&gt; '/bin/bash',
+  groups =&gt; ['devs'],
+}
+</code></pre>
+
+<p>Which outputs:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/tmp$ sudo puppet apply /examples/user.pp
+Notice: Compiled catalog for ubuntu-xenial.lan in environment production in 0.01 seconds
+Notice: /Stage[main]/Main/Group[devs]/ensure: created
+Notice: /Stage[main]/Main/User[junipernine]/ensure: created
+Notice: Applied catalog in 0.05 seconds
+</code></pre>
+
+<p>And did this:</p>
+
+<pre><code class="Shell">cat /etc/passwd
+junipernine:x:3001:3001::/home/junipernine:/bin/bash
+
+cat /etc/group
+devs:x:3000:junipernine
+junipernine:x:3001:
+
+</code></pre>
+
+<h5 id="theuserresource">The User resource</h5>
+
+<p>The title of the resource is the username (login name) of the user; in this example, <code>juniper nine</code>. The <code>ensure =&gt; present</code> attribute says that the user should exist on the system.</p>
+
+<p>The <code>uid</code> attribute needs a little more explanation. </p>
+
+<p>On Unix-like systems, each user has an individual numerical id, known as the <strong>uid</strong>. The text name associated with the user is merely a convenience for those (mere humans, for example) who prefer strings to numbers. </p>
+
+<p>Access permissions are in fact based on the uid and not the username.</p>
+
+<p>Why set the <code>uid</code> attribute? </p>
+
+<p>Often, when creating users manually, we don&#8217;t specify a uid, so the system will assign one automatically. The problem with this is that if you create the same user (<code>juniper nine</code>, for example) on three different nodes, you may end up with three different uids. </p>
+
+<p>This would be fine as long as you have never shared files between nodes, or copied data from one place to another. But in fact, this happens all the time, so it&#8217;s important to make sure that a given user&#8217;s uid is the same across all the nodes in your infrastructure. </p>
+
+<p>That&#8217;s why we specify the <code>uid</code> attribute in the Puppet manifest.</p>
+
+<p>The <code>home</code> attribute sets the user&#8217;s home directory (this will be the current working directory when the user logs in, if she does log in, and also the default working directory for cron jobs that run as the user).</p>
+
+<p>The <code>shell</code> attribute specifies the command-line shell to run when the user logs in interactively. For humans, this will generally be a user shell, such as <code>/bin/bash</code> or <code>/bin/sh</code>. </p>
+
+<p>For service users, such as <code>www-data</code>, the shell should be set to <code>/usr/sbin/nologin</code> (on Ubuntu systems), which does not allow interactive access, and prints a message saying <code>This account is currently not available</code>. All users who do not need to log in interactively should have the <code>nologin</code> shell.</p>
+
+<p>If the user needs to be a member of certain groups, you can pass the <code>groups</code> attribute an array of the group names (just <code>devs</code> in this example).</p>
+
+<p>Although Puppet supports a <code>password</code> attribute for <code>user</code> resources, I don&#8217;t advise you to use it. Service users don&#8217;t need passwords, and interactive users should be logging in with SSH keys. In fact, you should configure SSH to disable password logins altogether (set <code>PasswordAuthentication no</code> in <code>sshd_config</code>).</p>
+
+<h5 id="thegroupresource">The group resource</h5>
+
+<p>The title of the resource is the name of the group (<code>devs</code>). </p>
+
+<p>You need not specify a <code>gid</code> attribute but, for the same reasons as the <code>uid</code> attribute, it&#8217;s a good idea to do so.</p>
+
+<h5 id="managingsshkeys">Managing ssh keys</h5>
+
+<p>I like to have as few interactive logins as possible on production nodes, because it reduces the attack surface. Fortunately, with configuration management, it should rarely be necessary to actually log in to a node. </p>
+
+<p>The most common reasons for needing an interactive login are for system maintenance and troubleshooting, and for deployment. </p>
+
+<p>In both cases there should be a single account named for this specific purpose (for example, <code>admin</code> or <code>deploy</code>), and it should be configured with the SSH keys of any users or systems that need to log in to it.</p>
+
+<p>Puppet provides the <code>ssh_authorized_key</code> resource to control the SSH keys associated with a user account. </p>
+
+<p>The following example shows how to use <code>ssh_authorized_key</code> to add an SSH key (mine, in this instance) to the <code>ubuntu</code> user on our Vagrant VM (<code>ssh_authorized_key.pp</code>):</p>
+
+<pre><code class="Shell">ssh_authorized_key { ‘anthony@junipernine.com':
+  user =&gt; 'ubuntu',
+  type =&gt; 'ssh-rsa',
+  key  =&gt; 'AAAAB3NzaC1yc2EAAAABIwAAAIEA3ATqENg+GWACa2BzeqTdGnJhNoBer8x6pfWkzNzeM8Zx7/2Tf2pl7kHdbsiTXEUawqzXZQtZzt/j3Oya+PZjcRpWNRzprSmd2UxEEPTqDw9LqY5S2B8og/NyzWaIYPsKoatcgC7VgYHplcTbzEhGu8BsoEVBGYu3IRy5RkAcZik=',
+}
+</code></pre>
+
+<ul>
+<li>The title of the resource is the SSH key comment, which reminds us who the key belongs to.</li>
+<li>The <code>user</code> attribute specifies the user account which this key should be authorized for.</li>
+<li>The <code>type</code> attribute identifies the SSH key type, usually <code>ssh-rsa</code> or <code>ssh-dss</code>.</li>
+<li>The <code>key</code> attribute sets the key itself.</li>
+</ul>
+
+<p>When this manifest is applied, it adds the following to the <code>ubuntu</code> user&#8217;s <code>authorized_keys</code> file:</p>
+
+<pre><code class="Shell">ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAIEA3ATqENg+GWACa2BzeqTdGnJhNoBer8x6pfWkzNzeM8Zx7/2Tf2pl7kHdbsiTXEUawqzXZQtZzt/j3Oya+PZjcRpWNRzprSmd2UxEEPTqDw9LqY5S2B8og/NyzWaIYPsKoatcgC7VgYHplcTbzEhGu8BsoEVBGYu3IRy5RkAcZik= anthony@junipernine.com
+</code></pre>
+
+<p>A user account can have multiple SSH keys associated with it, and anyone holding one of the corresponding private keys and its passphrase will be able to log in as that user.</p>
+
+<h5 id="removingusers">Removing Users</h5>
+
+<p>If you need to have Puppet remove user accounts (for example, as part of an employee leaving process), it&#8217;s not enough to simply remove the <code>user</code> resource from the Puppet manifest. </p>
+
+<p>Puppet will ignore any users on the system that it doesn&#8217;t know about, and it certainly will not remove anything it finds on the system that isn&#8217;t mentioned in the Puppet manifest; that would be extremely undesirable (almost everything would be removed). </p>
+
+<p>So we need to retain the <code>user</code> declaration for a while, but set the <code>ensure`` attribute to </code>absent<code> (</code>user_remove.pp```):</p>
+
+<pre><code class="Shell">user { 'godot':
+  ensure =&gt; absent,
+}
+
+</code></pre>
+
+<p>Once Puppet has run everywhere, you can remove the <code>user</code> resource if you like, but it does no harm to simply leave it in place, and in fact, it&#8217;s a good idea to do this, unless you can verify manually that the user has been deleted from every affected system.</p>
+
+<p>If you need to prevent a user logging in, but want to retain the account and any files owned by the user, for archival or compliance purposes, you can set their <code>shell</code> to <code>/usr/sbin/nologin</code>. </p>
+
+<p>You can also remove any <code>ssh_authorized_key</code> resources associated with their account, and set the <code>purge_ssh_keys</code> attribute to <code>true</code> on the <code>user</code> resource. </p>
+
+<p>This will remove any authorised keys for the user that are not managed by Puppet.</p>
+
+<h4 id="cron">Cron</h4>
+
+<p>Cron is the mechanism on Unix-like systems which runs scheduled jobs, sometimes known as batch jobs, at specified times or intervals. For example, system housekeeping tasks, such as log rotation or checking for security updates, are run from cron. </p>
+
+<p>The details of what to run and when to run it are kept in a specially formatted file called <code>crontab</code> (short for <strong>cron table</strong>).</p>
+
+<p>Puppet provides the <code>cron</code> resource for managing scheduled jobs, and we saw an example of this in the <code>run-puppet</code> manifest we developed in Chapter 3, <em>Managing your Puppet code with Git</em> (<code>run-puppet.pp</code>):</p>
+
+<pre><code class="Shell">cron { 'run-puppet':
+  command =&gt; '/usr/local/bin/run-puppet',
+  hour    =&gt; '*',
+  minute  =&gt; '*/15',
+}
+</code></pre>
+
+<p>The title <code>run-puppet</code> identifies the cron job (Puppet writes a comment to the <code>crontab</code> file containing this name to distinguish it from other manually-configured cron jobs). </p>
+
+<p>The <code>command</code> attribute specifies the command for cron to run, and the <code>hour</code> and <code>minute</code> specify the time (<code>*/15</code> is a cron syntax, meaning &#8220;every 15 minutes&#8221;).</p>
+
+<p>For more information about cron and the possible ways to specify the times of scheduled jobs, run the command <code>man 5 crontab</code>.</p>
+
+<h5 id="attributesofthecronresource">Attributes of the cron resource</h5>
+
+<p>The ``cron<code> resource has a few other useful attributes which are shown in the following example (</code>cron.pp```):</p>
+
+<pre><code class="Shell">cron { 'cron example':
+  command     =&gt; '/bin/date +%F',
+  user        =&gt; 'ubuntu',
+  environment =&gt; ['MAILTO=admin@example.com', 'PATH=/bin'],
+  hour        =&gt; '0',
+  minute      =&gt; '0',
+  weekday     =&gt; ['Saturday', 'Sunday'],
+}
+</code></pre>
+
+<p>The <code>user</code> attribute specifies who should run the cron job (if none is specified, the job runs as <code>root</code>). If the <code>environment</code> attribute is given, it sets any environment variables the cron job might need. A common use for this is to email any output from the cron job to a specified email address, using the <code>MAILTO</code> variable.</p>
+
+<p>As before, the <code>hour</code> and <code>minute</code> attributes set the time for the job to run, while you can use the <code>weekday</code> attribute to specify a particular day, or days, of the week. (The <code>monthday</code> attribute works the same way, and can take any range or array of values between 1&#8211;31 to specify the day of the month.)</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:~/puppet/examples$ sudo puppet apply /examples/cron.pp
+Notice: Compiled catalog for ubuntu-xenial.lan in environment production in 0.04 seconds
+Notice: /Stage[main]/Main/Cron[cron example]/ensure: created
+Notice: Applied catalog in 0.04 seconds
+
+vagrant@ubuntu-xenial:~/puppet/examples$ sudo crontab -l
+# HEADER: This file was autogenerated at 2018-10-17 10:39:06 +0000 by puppet.
+# HEADER: While it can still be managed manually, it is definitely not recommended.
+# HEADER: Note particularly that the comments starting with 'Puppet Name' should
+# HEADER: not be deleted, as doing so could cause duplicate cron jobs.
+# Puppet Name: run-puppet
+*/15 * * * * /usr/local/bin/run-puppet
+
+vagrant@ubuntu-xenial:~/puppet/examples$ su - ubuntu
+Password:
+
+ubuntu@ubuntu-xenial:~$ crontab -l
+# HEADER: This file was autogenerated at 2018-10-18 12:12:17 +0000 by puppet.
+# HEADER: While it can still be managed manually, it is definitely not recommended.
+# HEADER: Note particularly that the comments starting with 'Puppet Name' should
+# HEADER: not be deleted, as doing so could cause duplicate cron jobs.
+# Puppet Name: cron example
+MAILTO=admin@example.com
+PATH=/bin
+0 0 * * 6,0 /bin/date +%F
+</code></pre>
+
+<p>One important point about cron scheduling is that the default value for any schedule attribute is <code>*</code>, which means <em>all allowed values</em>. </p>
+
+<p>For example, if you do not specify an <code>hour</code> attribute, the cron job will be scheduled with an <code>hour</code> of <code>*</code>, meaning that it will run every hour. </p>
+
+<p>This is generally not what you want. If you do want it to run every hour, specify <code>hour =&gt; ‘*’</code> in your manifest, but otherwise, specify the particular hour it should run at.</p>
+
+<p>The same goes for <code>minute</code>. Accidentally leaving out the <code>minute</code> attribute and having a job run sixty times an hour can have amusing consequences, to say the least.</p>
+
+<h5 id="randomisingcronjobs">Randomising cronjobs</h5>
+
+<p>If you run a cron job on many nodes, it&#8217;s a good idea to make sure the job doesn&#8217;t run everywhere at the same time. Puppet provides a built-in function <code>fqdn_rand()</code> to help with this; it provides a random number up to a specified maximum value, which will be different on each node, because the random number generator is seeded with the node&#8217;s hostname.</p>
+
+<p>If you have several such jobs to run, you can also supply a further seed value to the <code>fqdn_rand()</code> function, which can be any string and which will ensure that the value is different for each job (<code>fqdn_rand.pp</code>):</p>
+
+<pre><code class="Shell">cron { 'run daily backup':
+  command =&gt; '/usr/local/bin/backup',
+  minute  =&gt; '0',
+  hour    =&gt; fqdn_rand(24, 'run daily backup'),
+}
+
+cron { 'run daily backup sync':
+  command =&gt; '/usr/local/bin/backup_sync',
+  minute  =&gt; '0',
+  hour    =&gt; fqdn_rand(24, 'run daily backup sync'),
+}
+
+</code></pre>
+
+<p>Output:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:~/puppet/examples$ sudo puppet apply /examples/fqdn_rand.pp
+Notice: Compiled catalog for ubuntu-xenial.lan in environment production in 0.04 seconds
+Notice: /Stage[main]/Main/Cron[run daily backup]/ensure: created
+Notice: /Stage[main]/Main/Cron[run daily backup sync]/ensure: created
+Notice: Applied catalog in 0.03 seconds
+
+vagrant@ubuntu-xenial:~/puppet/examples$ sudo crontab -l
+# HEADER: This file was autogenerated at 2018-10-18 12:23:26 +0000 by puppet.
+# HEADER: While it can still be managed manually, it is definitely not recommended.
+# HEADER: Note particularly that the comments starting with 'Puppet Name' should
+# HEADER: not be deleted, as doing so could cause duplicate cron jobs.
+# Puppet Name: run-puppet
+
+*/15 * * * * /usr/local/bin/run-puppet
+# Puppet Name: run daily backup
+0 22 * * * /usr/local/bin/backup
+# Puppet Name: run daily backup sync
+0 11 * * * /usr/local/bin/backup_sync
+</code></pre>
+
+<p>Because we gave a different string as the second argument to <code>fqdn_rand</code> for each cron job, it will return a different random value for each <code>hour</code> attribute.</p>
+
+<p>The range of values returned by <code>fqdn_rand()</code> includes 0, but does not include the maximum value you specify. So, in the previous example, the values for <code>hour</code> will be between 0 and 23, inclusive.</p>
+
+<h5 id="removingcronjobs">Removing cron jobs</h5>
+
+<p>Just as with <code>user</code> resources, or any type of resource, removing the resource declaration from your Puppet manifest does not remove the corresponding configuration from the node. </p>
+
+<p>In order to do that you need to specify <code>ensure =&gt; absent</code> on the resource.</p>
+
+<h4 id="exec">Exec</h4>
+
+<p>While the other resource types we&#8217;ve seen so far (<code>file</code>, <code>package</code>, <code>service</code>, <code>user</code>, <code>ssh_authorized_key</code>, and <code>cron</code>) have modelled some concrete piece of state on the node, such as a file, the <code>exec</code> resource is a little different. </p>
+
+<p>An <code>exec</code> allows you to run any arbitrary command on the node. This might create or modify state, or it might not; anything you can run from the command line, you can run via an <code>exec</code> resource.</p>
+
+<h5 id="automatingmanualinteraction">Automating manual interaction</h5>
+
+<p>The most common use for an <code>exec</code> resource is to simulate manual interaction on the command line. </p>
+
+<p>Some older software is not packaged for modern operating systems, and needs to be compiled and installed from source, which requires you to run certain commands. The authors of some software have also not realised, or don&#8217;t care, that users may be trying to install their product automatically and have install scripts which prompt for user input. </p>
+
+<p>This can require the use of <code>exec</code> resources to work around the problem.</p>
+
+<h5 id="attributesoftheexecresource">Attributes of the exec resource</h5>
+
+<p>The following example shows an exec resource for building and installing an imaginary piece of software (<code>exec.pp</code>):</p>
+
+<pre><code class="Shell">exec { 'install-cat-picture-generator':
+  cwd     =&gt; '/tmp/cat-picture-generator',
+  command =&gt; '/tmp/cat-picture/generator/configure &amp;&amp; /usr/bin/make install',
+  creates =&gt; '/usr/local/bin/cat-picture-generator',
+}
+</code></pre>
+
+<p>The title of the resource can be anything you like, though, as usual with Puppet resources it must be unique. I tend to name <code>exec</code> resources after the problem they&#8217;re trying to solve, as in this example.</p>
+
+<p>The <code>cwd</code> attribute sets the working directory where the command will be run (<strong>current working directory</strong>). When installing software, this is generally the software source directory. The <code>command</code> attribute gives the command to run. </p>
+
+<p>This must be the full path to the command, but you can chain several commands together using the shell <code>&amp;&amp;</code> operator. This executes the next command only if the previous one succeeded, so in the example, if the <code>configure</code> command completes successfully, Puppet will go on to run <code>make install</code>, otherwise, it will stop with an error.</p>
+
+<p>If you apply this example, Puppet will give you an error like the following:</p>
+
+<pre><code class="Shell">Error: /Stage[main]/Main/Exec[install-cat-picture-generator]/returns: change from notrun to 0 failed: Could not find command '/tmp/cat-picture/generator/configure'
+</code></pre>
+
+<p>This is expected because the specified command does not, in fact, exist. In your own manifests, you may see this error if you give the wrong path to a command, or if the package that provides the command hasn&#8217;t been installed yet.</p>
+
+<p>The <code>creates</code> attribute specifies a file which should exist after the command has been run. If this file is present, Puppet will not run the command again. This is very useful because without a <code>creates</code> attribute, an <code>exec</code> resource will run every time Puppet runs, which is generally not what you want. The <code>creates</code> attribute tells Puppet, in effect, &quot;Run the <code>exec</code> only if this file doesn&#8217;t exist.&quot;</p>
+
+<p>Let&#8217;s see how this works, imagining that this <code>exec</code> is being run for the first time. We assume that the <code>/tmp/cat-picture/</code> directory exists and contains the source of the <code>cat-picture-generator</code> application.</p>
+
+<ul>
+<li>Puppet checks the <code>creates</code> attribute and sees that the <code>/usr/local/bin/cat-picture-generator</code> file is not present; therefore, the <code>exec</code> resource must be run.</li>
+<li>Puppet runs the <code>/tmp/cat-picture-generator/configure &amp;&amp; /usr/bin/make install</code> command. As a side effect of these commands, the <code>/usr/local/bin/cat-picture-generator</code> file is created.</li>
+<li>Next time Puppet runs, it again checks the <code>creates</code> attribute. This time <code>/usr/local/bin/cat-picture-generator</code> exists, so Puppet does nothing.</li>
+</ul>
+
+<p>This <code>exec</code> resource will never be applied again so long as the file specified in the <code>creates</code> attribute exists. You can test this by deleting the file and applying Puppet again. The <code>exec</code> resource will be triggered and the file recreated.</p>
+
+<p>Make sure that your <code>exec</code> resources always include a <code>creates</code> attribute (or a similar control attribute, such as <code>onlyif</code> or <code>unless</code>, which we&#8217;ll look at later in this chapter). Without this, the <code>exec</code> command will be run every time Puppet runs, which is almost certainly not what you want.</p>
+
+<p>Note that building and installing software from source is not a recommended practice for production systems. </p>
+
+<p>It&#8217;s better to build the software on a dedicated build server (perhaps using Puppet code similar to this example), create a system package for it, and then use Puppet to install that package on production nodes.</p>
+
+<h5 id="theuserattribute">The user attribute</h5>
+
+<p>If you don&#8217;t specify a <code>user</code> attribute for an <code>exec</code> resource, Puppet will run the command as the <code>root</code> user. </p>
+
+<p>This is often appropriate for installing system software or making changes to the system configuration, but if you need the command to run as a particular user, specify the <code>user</code> attribute, as in the following example (<code>exec_user.pp</code>):</p>
+
+<pre><code class="Shell">exec { 'say-hello':
+  command =&gt; '/bin/echo Hello, this is `whoami` &gt;/tmp/hello-ubuntu.txt',
+  user    =&gt; 'ubuntu',
+  creates =&gt; '/tmp/hello-ubuntu.txt',
+}
+</code></pre>
+
+<p>This will run the specified command as the <code>ubuntu</code> user. </p>
+
+<p>The <code>whoami</code> command returns the name of the user running it, so when you apply this manifest, the file <code>/tmp/hello-ubuntu.txt</code> will be created with the following contents:</p>
+
+<pre><code class="Shell">Hello, this is ubuntu
+</code></pre>
+
+<p>As with the earlier example, the <code>creates</code> attribute prevents Puppet from running this command more than once.</p>
+
+<p><strong>NB..</strong> This test is far more demonstrable by removing the text file and running it again.</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/tmp$ sudo puppet apply /examples/exec_user.pp
+Notice: Compiled catalog for ubuntu-xenial.lan in environment production in 0.05 seconds
+Notice: /Stage[main]/Main/Exec[say-hello]/returns: executed successfully
+Notice: Applied catalog in 0.02 seconds
+
+vagrant@ubuntu-xenial:/tmp$ ls
+hello-ubuntu.txt  ssh-EvbeMoesso  vagrant-shell  vboxguest-Module.symvers
+
+vagrant@ubuntu-xenial:/tmp$ cat hello-ubuntu.txt
+Hello, this is ubuntu
+
+vagrant@ubuntu-xenial:/tmp$ sudo puppet apply /examples/exec_user.pp
+Notice: Compiled catalog for ubuntu-xenial.lan in environment production in 0.05 seconds
+Notice: Applied catalog in 0.01 seconds
+
+vagrant@ubuntu-xenial:/tmp$ sudo rm hello-ubuntu.txt
+
+vagrant@ubuntu-xenial:/tmp$ sudo puppet apply /examples/exec_user.pp
+Notice: Compiled catalog for ubuntu-xenial.lan in environment production in 0.05 seconds
+Notice: /Stage[main]/Main/Exec[say-hello]/returns: executed successfully
+Notice: Applied catalog in 0.02 seconds
+</code></pre>
+
+<h5 id="theonlyifandunlessattributes">The onlyif and unless attributes</h5>
+
+<p>Suppose you only want an <code>exec</code> resource to be applied under certain conditions. For example, a command which processes incoming data files only needs to run if there are data files waiting to be processed. </p>
+
+<p>In this case, it&#8217;s no good adding a <code>creates</code> attribute; we want the existence of a certain file to trigger the <code>exec</code>, not prevent it.</p>
+
+<p>The <code>onlyif</code> attribute is a good way to solve this problem. It specifies a command for Puppet to run, and the exit status from this command determines whether or not the <code>exec</code> will be applied. </p>
+
+<p>On Unix-like systems, commands generally return an exit status of zero to indicate success and a non-zero value for failure. </p>
+
+<p>The following example shows how to use <code>onlyif</code> in this way (<code>exec_onlyif.pp</code>):</p>
+
+<pre><code class="Shell">exec { 'process-incoming-cat-pictures':
+  command =&gt; '/usr/local/bin/cat-picture-generator --import /tmp/incoming/*',
+  onlyif  =&gt; '/bin/ls /tmp/incoming/*',
+}
+</code></pre>
+
+<p>The exact command isn&#8217;t important here, but let&#8217;s assume it&#8217;s something that we would only want to run if there are any files in the <code>/tmp/incoming/</code> directory.</p>
+
+<p>The <code>onlyif</code> attribute specifies the check command which Puppet should run first, to determine whether or not the <code>exec</code> resource needs to be applied. If there is nothing in the <code>/tmp/incoming/</code> directory, then <code>ls /tmp/incoming/*</code> will return a non-zero exit status. Puppet interprets this as failure, so does not apply the <code>exec</code> resource.</p>
+
+<p>On the other hand, if there are files in the <code>/tmp/incoming/</code> directory, the <code>ls</code> command will return success. This tells Puppet the <code>exec</code> resource must be applied, so it proceeds to run the <code>/usr/local/bin/cat-picture-generator</code> command (and we can assume this command deletes the incoming files after processing).
+You can think of the <code>onlyif</code> attribute as telling Puppet, &quot;Run the <code>exec</code> resource <em>only if </em> this command succeeds.&quot;</p>
+
+<p>The <code>unless</code> attribute is exactly the same as <code>onlyif</code> but with the opposite sense. If you specify a command to the <code>unless</code> attribute, the <code>exec</code> will always be run unless the command returns a zero exit status. You can think of <code>unless</code> as telling Puppet, &quot;Run the <code>exec</code> resource <em>unless</em> this command succeeds.”
+
+When you apply your manifest, if you see an <code>exec</code> resource running every time which shouldn&#8217;t be, check whether it specifies a <code>creates</code>, <code>unless</code>, or <code>onlyif</code> attribute. </p>
+
+<p>If it specifies the <code>creates</code> attribute, it may be looking for the wrong file; if the <code>unless</code> or <code>onlyif</code> command is specified, it may not be returning what you expect. </p>
+
+<p>You can see what command is being run and what output it generates by running <code>sudo puppet apply</code> with the <code>-d</code> (debug) flag:</p>
+
+<pre><code class="Shell">sudo puppet apply -d exec_onlyif.pp
+Debug: Exec[process-incoming-cat-pictures](provider=posix): Executing check '/bin/ls /tmp/incoming/*'
+Debug: Executing: '/bin/ls /tmp/incoming/*'
+Debug: /Stage[main]/Main/Exec[process-incoming-cat-pictures]/onlyif: /tmp/incoming/foo
+</code></pre>
+
+<p><strong>NB.</strong> In reality it is far more verbose than this.</p>
+
+<h5 id="therefreshonlyattribute">The refreshonly attribute</h5>
+
+<p>It&#8217;s quite common to use <code>exec</code> resources for one-off commands, such as rebuilding a database, or setting a system-tunable parameter. </p>
+
+<p>These generally only need to be triggered once, when a package is installed, or occasionally, when a config file is updated. If an <code>exec</code> resource needs to run only when some other Puppet resource is changed, we can use the <code>refreshonly</code> attribute to do this.
+If <code>refreshonly</code> is <code>true</code>, the <code>exec</code> will never be applied unless another resource triggers it with <code>notify</code>. </p>
+
+<p>In the following example, Puppet manages the <code>/etc/aliases</code> file (which maps local usernames to email addresses), and a change to this file triggers the execution of the command <code>newaliases</code>, which rebuilds the system alias database (<code>exec_refreshonly.pp</code>):</p>
+
+<pre><code class="Shell">file { '/etc/aliases':
+  content =&gt; 'root: anthony@junipernine.com',
+  notify  =&gt; Exec['newaliases'],
+}
+
+exec { 'newaliases':
+  command     =&gt; '/usr/bin/newaliases',
+  refreshonly =&gt; true,
+}
+</code></pre>
+
+<p>When this manifest is applied for the first time, the <code>/etc/aliases</code> resource causes a change to the file&#8217;s contents, so Puppet sends a <code>notify</code> message to the <code>exec</code> resource. </p>
+
+<p>This causes the <code>newaliases</code> command to be run. </p>
+
+<p>If you apply the manifest again, you will see that the <code>aliases</code> file is not changed, so the <code>exec</code> is not run.</p>
+
+<p>Results:</p>
+
+<pre><code class="Shell">Info: Computing checksum on file /etc/aliases
+Info: /Stage[main]/Main/File[/etc/aliases]: Filebucketed /etc/aliases to puppet with sum 52417f6dfdf4444dd00691e149e0f7ea
+Notice: /Stage[main]/Main/File[/etc/aliases]/content: content changed '{md5}52417f6dfdf4444dd00691e149e0f7ea' to '{md5}b8c04af5e2ab8070de8de8293bd03540'
+Info: /Stage[main]/Main/File[/etc/aliases]: Scheduling refresh of Exec[newaliases]
+Debug: /Stage[main]/Main/File[/etc/aliases]: The container Class[Main] will propagate my refresh event
+Debug: Exec[newaliases](provider=posix): Executing '/usr/bin/newaliases'
+Debug: Executing: '/usr/bin/newaliases'
+Notice: /Stage[main]/Main/Exec[newaliases]: Triggered 'refresh' from 1 event
+Debug: /Stage[main]/Main/Exec[newaliases]: The container Class[Main] will propagate my refresh event
+Debug: Class[Main]: The container Stage[main] will propagate my refresh event
+Debug: Finishing transaction 27768540
+</code></pre>
+
+<p>Run again:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/tmp$ sudo puppet apply /examples/exec_refreshonly.pp
+Notice: Compiled catalog for ubuntu-xenial.lan in environment production in 0.50 seconds
+Notice: Applied catalog in 0.02 seconds
+</code></pre>
+
+<p>Add a row:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/tmp$ sudo cat /etc/aliases
+root: admin@example.com
+aj9: anthony@junipernine.com
+</code></pre>
+
+<p>Run again:</p>
+
+<pre><code class="Shell">vagrant@ubuntu-xenial:/tmp$ sudo puppet apply /examples/exec_refreshonly.pp
+Notice: Compiled catalog for ubuntu-xenial.lan in environment production in 0.50 seconds
+Notice: /Stage[main]/Main/File[/etc/aliases]/content: content changed '{md5}4ed1e8970ebcf6a644c80947077d771f' to '{md5}b8c04af5e2ab8070de8de8293bd03540'
+Notice: /Stage[main]/Main/Exec[newaliases]: Triggered 'refresh' from 1 event
+Notice: Applied catalog in 0.05 seconds
+</code></pre>
+
+<p>Triggered the event again.</p>
+
+<p>While the <code>refreshonly</code> attribute is occasionally extremely useful, over-use of it can make your Puppet manifests hard to understand and debug, and it can also be rather fragile. Felix Frank makes this point in a blog post, <em>Friends Don&#8217;t Let Friends Use Refreshonly</em>:
+<code>Email
+”With the </code>exec<code> resource type considered the last ditch, its </code>refreshonly<code> parameter should be seen as especially outrageous. To make an </code>exec<code> resource fit into Puppet's model better, you should use [the </code>creates<code>, </code>onlyif<code>, or </code>unless<code>] parameters instead.&quot; 
+</code></p>
+
+<p>Refer to:</p>
+
+<p>http://ffrank.github.io/misc/2015/05/26/friends-don&#8217;t-let-friends-use-refreshonly/</p>
+
+<p>Note that you don&#8217;t need to use the <code>refreshonly</code> attribute in order to make the <code>exec</code> resource notifiable by other resources. Any resource can notify an <code>exec</code> resource in order to make it run; however, if you don&#8217;t want it to run <em>unless</em>  it&#8217;s notified, use <code>refreshonly</code>.</p>
+
+<p>By the way, if you actually want to manage email aliases on a node, use Puppet&#8217;s built-in <code>mailalias</code> resource. The previous example is just to demonstrate the use of <code>refreshonly</code>.</p>
+
+<h5 id="thelogoutputattribute">The logoutput attribute</h5>
+
+<p>When Puppet runs shell commands via an <code>exec</code> resource, the output is normally hidden from us. However, if the command doesn&#8217;t seem to be working properly, it can be very useful to see what output it produced, as this usually tells us why it didn&#8217;t work.</p>
+
+<p>The <code>logoutput</code> attribute determines whether Puppet will log the output of the <code>exec</code> command along with the usual informative Puppet output. It can take three values: <code>true</code>, <code>false</code>, or <code>on_failure</code>.</p>
+
+<p>If <code>logoutput</code> is set to <code>on_failure</code> (which is the default), Puppet will only log command output when the command fails (that is, returns a non-zero exit status). </p>
+
+<p>If you never want to see command output, set it to <code>false</code>.</p>
+
+<p>Sometimes, however, the command returns a successful exit status but does not appear to do anything. Setting <code>logoutput</code> to <code>true</code> will force Puppet to log the command output regardless of exit status, which should help you figure out what&#8217;s going on.</p>
+
+<h5 id="thetimeoutattribute">The timeout attribute</h5>
+
+<p>Sometimes, commands can take a long time to run, or never terminate at all. </p>
+
+<p>By default, Puppet allows an <code>exec</code> command to run for 300 seconds, at which point Puppet will terminate it if it has not finished. </p>
+
+<p>If you need to allow a little longer for the command to complete, you can use the <code>timeout</code> attribute to set this. The value is the maximum execution time for the command in seconds.</p>
+
+<p>Setting a <code>timeout</code> value of <code>0</code> disables the automatic timeout altogether and allows the command to run forever. </p>
+
+<p>This should be the last resort, as a command which blocks or hangs could stop Puppet&#8217;s automatic runs altogether if no timeout is set. </p>
+
+<p>To find a suitable value for <code>timeout</code>, try running the command a few times and choose a value which is perhaps twice as long as a typical run. </p>
+
+<p>This should avoid failures caused by slow network conditions, for example, but not block Puppet from running altogether.</p>
+
+<h5 id="hownottomisuseexecresources">How not to misuse exec resources</h5>
+
+<p>The <code>exec</code> resource can do anything to the system that you could do from the command line. As you can imagine, such a powerful tool can be misused. </p>
+
+<p>In theory, Puppet is a declarative language: the manifest specifies the way things should be, and it is up to Puppet to take the necessary actions to make them so. </p>
+
+<p>Manifests are therefore what computer scientists call <strong>idempotent</strong>: the system is always in the same state after the catalog has been applied, and however many times you apply it, it will always be in that state.</p>
+
+<p>The <code>exec</code> resource rather spoils this theoretical picture, by allowing Puppet manifests to have side-effects. Since your <code>exec</code> command can do anything, it could, for example, create a new 1 GB file on disk with a random name, and since this will happen every time Puppet runs, you could rapidly run out of disk space. </p>
+
+<p>It&#8217;s best to avoid commands with side-effects like this. In general, there&#8217;s no way to know from within Puppet exactly what changes to a system were caused by an <code>exec</code> resource.</p>
+
+<p>Commands run via <code>exec</code> are also sometimes used to bypass Puppet&#8217;s existing resources. For example, if the <code>user</code> resource doesn&#8217;t do quite what you want for some reason, you could create a user by running the <code>adduser</code> command directly from an <code>exec</code>. </p>
+
+<p>This is also a bad idea, since by doing this you lose the declarative and cross-platform nature of Puppet&#8217;s built-in resources. </p>
+
+<p><code>exec</code> resources potentially change the state of the node in a way that&#8217;s invisible to Puppet&#8217;s catalog.</p>
 
 </body>
 </html>
